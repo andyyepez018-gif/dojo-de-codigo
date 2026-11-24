@@ -68,7 +68,7 @@ function pintaPie() { const el = $('#pie-lateral'); if (el) el.textContent = (P.
 
 /* ───────────── App instalable y actualizable (fuera de Claude) ───────────── */
 const VERSION = '1.1.0';
-const URL_APP = '';   // dirección de la app instalable, cuando esté publicada
+const URL_APP = 'https://andyyepez018-gif.github.io/dojo-de-codigo/';   // la app instalable
 const enClaude = !!(window.claude && window.claude.use);
 const instalada = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 const esIphone = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
