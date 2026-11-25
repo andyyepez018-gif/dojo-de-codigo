@@ -106,6 +106,10 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   ok('al final: terminó y la salida completa', /terminó/.test(await p.textContent('.estado-traza')) && /Resultado: 42/.test(await p.locator('.traza .salida').last().textContent()));
   await p.getByRole('button', { name: '← Volver al editor' }).click();
   ok('vuelve al editor con el código', (await p.inputValue('#editor-codigo')).includes('def doble'));
+  await p.locator('#menu-lateral a[href="#ruta"]').click(); await p.locator('.tema').nth(1).click();
+  await p.locator('#v-ruta .chip', { hasText: 'PSeInt' }).click(); await p.getByRole('button', { name: 'Ver paso a paso' }).click();
+  await p.waitForSelector('.controles-traza');
+  ok('el paso a paso desde la Ruta muestra el ejemplo, no el código viejo del editor', /manzanas/.test(await p.textContent('.traza .codigo')) && !/doble/.test(await p.textContent('.traza .codigo')));
 
   console.log('5. Ejercicio y celebración de cinturón');
   await c.close();

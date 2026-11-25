@@ -1,6 +1,6 @@
 /* Service worker del Dojo de código: guarda la app para usarla sin internet y detecta versiones nuevas.
    construir.py rellena VERSION (versión + huella del contenido) y la lista de archivos. */
-const VERSION = '1.2.0-0653a79933';
+const VERSION = '1.2.0-7fbdcfaebe';
 const CACHE = 'dojo-' + VERSION;
 const ARCHIVOS = ["./", "app.js", "contenido.js", "ejecutor.js", "fuentes/fuentes.css", "fuentes/ibm-plex-mono-latin-400-normal.woff2", "fuentes/ibm-plex-mono-latin-500-normal.woff2", "fuentes/ibm-plex-mono-latin-600-normal.woff2", "fuentes/ibm-plex-mono-latin-ext-400-normal.woff2", "fuentes/ibm-plex-mono-latin-ext-500-normal.woff2", "fuentes/ibm-plex-mono-latin-ext-600-normal.woff2", "fuentes/ibm-plex-sans-latin-400-normal.woff2", "fuentes/ibm-plex-sans-latin-500-normal.woff2", "fuentes/ibm-plex-sans-latin-600-normal.woff2", "fuentes/ibm-plex-sans-latin-ext-400-normal.woff2", "fuentes/ibm-plex-sans-latin-ext-500-normal.woff2", "fuentes/ibm-plex-sans-latin-ext-600-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-500-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-700-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-900-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-ext-500-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-ext-700-normal.woff2", "fuentes/zen-kaku-gothic-new-latin-ext-900-normal.woff2", "icono-180.png", "icono-192.png", "icono-512.png", "icono-mascara-512.png", "index.html", "manifest.webmanifest", "motor.js", "nucleo.js", "trabajador.js", "ui.js"];
 self.addEventListener('install', e => {

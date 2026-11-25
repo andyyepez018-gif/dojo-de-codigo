@@ -98,7 +98,9 @@ function pintaMenus() {
 function ir(v) { if (location.hash !== '#' + v) location.hash = v; else mostrar(v); }
 function mostrar(v, forzar) {
   if (!VISTAS.some(x => x[0] === v)) v = 'hoy';
-  const cambia = v !== vista || forzar; vista = v; pintaMenus();
+  const cambia = v !== vista || forzar;
+  if (vista === 'lab' && v !== 'lab') detenerEjecucion();   // no dejar programas vivos al salir del laboratorio
+  vista = v; pintaMenus();
   document.querySelectorAll('[data-vista]').forEach(s => { s.hidden = s.dataset.vista !== v; });
   PINTA[v]();
   if (cambia) { window.scrollTo(0, 0); const s = $('#v-' + v); if (s && !U.reduceMovimiento()) { s.classList.remove('aparece'); void s.offsetWidth; s.classList.add('aparece'); } }
@@ -524,7 +526,7 @@ function abrirLab(o = {}) {
   if (o.codigo) ls.set('borrador-' + claveBorrador(), o.codigo);
   lab.datos = (o.entradas || []).join('\n'); resultados = null; ultimoFallo = null; lab.modo = 'editar'; lab.traza = null;
   if (vista === 'lab') PINTA.lab(); else ir('lab');
-  if (o.traza) pasoAPaso();
+  if (o.traza) pasoAPaso(codigoInicial());   // el código pedido, no el que tuviera el editor antes
 }
 function pintaEventos(caja, eventos) {
   caja.textContent = '';
@@ -567,10 +569,10 @@ function ejecutar() {
   botonesEjecucion();
 }
 function terminaRun() { botonesEjecucion(); pintaPistaLab(); }
-async function pasoAPaso() {
+async function pasoAPaso(codigoPedido) {
   if (lab.lang === 'html') return;
   detenerEjecucion();
-  const codigo = lab.modo === 'traza' && lab.traza && lab.traza.codigo ? lab.traza.codigo : editor ? editor.ta.value : codigoInicial();
+  const codigo = typeof codigoPedido === 'string' ? codigoPedido : lab.modo === 'traza' && lab.traza && lab.traza.codigo ? lab.traza.codigo : editor && editor.ta.isConnected ? editor.ta.value : codigoInicial();
   const lang = lab.lang;
   const entradas = lab.datos === '' ? [] : lab.datos.replace(/\n$/, '').split('\n');
   lab.modo = 'traza'; lab.traza = { cargando: true, codigo, lang }; if (vista === 'lab') PINTA.lab();
@@ -683,7 +685,7 @@ PINTA.lab = function () {
   } }, 'Volver a empezar');
   const acciones = h('div', { class: 'fila' },
     h('button', { class: 'btn primario', id: 'btn-ejecutar', onclick: ejecutar }, 'Ejecutar'),
-    h('button', { class: 'btn', onclick: pasoAPaso }, 'Paso a paso'),
+    h('button', { class: 'btn', onclick: () => pasoAPaso(editor.ta.value) }, 'Paso a paso'),
     x ? h('button', { class: 'btn exito', onclick: comprobar }, 'Comprobar el ejercicio') : null,
     reiniciar, h('span', { class: 'atajos' }, 'Ctrl + Enter ejecuta · Ctrl + / comenta'));
   el.append(h('div', { class: 'columna' }, tabs, cab, h('div', { class: 'lab' }, editor.el, acciones, h('div', { id: 'avisos-lab', class: 'pila' }),
