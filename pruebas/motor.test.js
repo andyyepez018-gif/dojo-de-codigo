@@ -119,5 +119,32 @@ falla('string+int', 'cpp', C('    string s = "a";\n    s = s + 5;'), 6, 'sumar')
 falla('llave', 'cpp', '#include <iostream>\nusing namespace std;\nint main() {\n    cout << 1;\n', 3, '«}»');
 falla('cin texto', 'cpp', C('    int n;\n    cin >> n;'), 6, 'entero', ['hola']);
 falla('tipo raro', 'cpp', C('    entero x = 5;'), 5, 'tipo');
+/* ── Ampliaciones (v1.2) ── */
+ok('dict', 'py', 'd = {"ana": 3, "leo": 5}\nd["mia"] = 7\nprint(d)\nprint(d["leo"], len(d), "ana" in d, d.get("x", 0))\nfor k, v in d.items():\n    print(k, v)\ndel d["ana"]\nprint(list(d.keys()), sum(d.values()))', "{'ana': 3, 'leo': 5, 'mia': 7}\n5 3 True 0\nana 3\nleo 5\nmia 7\n['leo', 'mia'] 12\n");
+ok('dict contar', 'py', 'c = {}\nfor letra in "banana":\n    c[letra] = c.get(letra, 0) + 1\nprint(c)', "{'b': 1, 'a': 3, 'n': 2}\n");
+ok('comprensión', 'py', 'a = [1, 2, 3, 4]\nprint([x * x for x in a if x % 2 == 0])\nprint(" ".join(str(n) for n in a))\nprint(sum(x for x in range(5)))', '[4, 16]\n1 2 3 4\n10\n');
+ok('del lista', 'py', 'a = [5, 6, 7]\ndel a[0]\nprint(a)', '[6, 7]\n');
+ok('type', 'py', 'print(type(5), type(2.5), type("a"), type([1]), type({}))', "<class 'int'> <class 'float'> <class 'str'> <class 'list'> <class 'dict'>\n");
+falla('else if', 'py', 'x = 1\nif x > 3:\n    print(1)\nelse if x > 0:\n    print(2)', 4, 'elif');
+falla('keyerror', 'py', 'd = {"a": 1}\nprint(d["b"])', 2, 'KeyError');
+falla('lista como clave', 'py', 'd = {}\nd[[1, 2]] = 3', 2, 'TypeError');
+ok('setprecision', 'cpp', '#include <iomanip>\n' + C('    double p = 10.0 / 3;\n    cout << fixed << setprecision(2) << p << endl;\n    cout << setw(5) << 42 << "|" << endl;\n    cout << left << setw(5) << "ab" << "|" << endl;'), '3.33\n   42|\nab   |\n');
+ok('precisión sin fixed', 'cpp', C('    cout << setprecision(3) << 3.14159 << endl;'), '3.14\n');
+falla('fuera del for', 'cpp', C('    for (int i = 0; i < 3; i++) {\n    }\n    cout << i;'), 7, 'bloque');
+{ const r = M.correr(C('    int a = 5;\n    if (a = 3) cout << "x";\n    while (a > 9);'), 'cpp');
+  if (r.avisos.length === 2 && r.avisos[0].linea === 6 && /==/.test(r.avisos[0].texto) && r.avisos[1].linea === 7) bien++; else { mal++; console.log('✗ avisos C++', JSON.stringify(r.avisos)); } }
+{ const r = M.correr('def doble(x):\n    y = x * 2\n    return y\nn = 4\nm = doble(n)\nprint(m)', 'py', [], { traza: true });
+  const lineas = r.traza.map(t => t.linea).join(','); const enFuncion = r.traza.find(t => t.pila.length === 1 && t.vars.some(v => v.n === 'y'));
+  const ultimo = r.traza[r.traza.length - 1];
+  if (lineas === '1,4,5,2,3,6,0' && enFuncion && enFuncion.vars.find(v => v.n === 'y').v === '8' && ultimo.fin && ultimo.salida === 2) bien++; else { mal++; console.log('✗ traza py', lineas, JSON.stringify(r.traza.slice(-2))); } }
+{ const r = M.correr('Para i <- 1 Hasta 3 Hacer\n    Escribir i\nFinPara', 'ps', [], { traza: true });
+  const l = r.traza.map(t => t.linea).join(','); const v = r.traza.filter(t => t.linea === 2).map(t => t.vars.find(x => x.n === 'i').v).join(',');
+  if (l === '1,2,1,2,1,2,0' && v === '1,2,3') bien++; else { mal++; console.log('✗ traza ps', l, v); } }
+{ const r = M.correr('int a[3] = {1, 2, 3};\nint s = 0;\nfor (int i = 0; i < 3; i++) s += a[i];\ncout << s;', 'cpp', [], { traza: true });
+  const ult = r.traza[r.traza.length - 2]; const a = ult.vars.find(x => x.n === 'a');
+  if (a && a.v === '{1, 2, 3}' && a.t === 'int[3]' && r.traza[r.traza.length - 1].fin) bien++; else { mal++; console.log('✗ traza cpp', JSON.stringify(r.traza.slice(-2))); } }
+{ const r = M.correr('x = 1\nprint(y)', 'py', [], { traza: true }); const u = r.traza[r.traza.length - 1];
+  if (u.error && u.linea === 2) bien++; else { mal++; console.log('✗ traza con error', JSON.stringify(u)); } }
+{ const r = M.correr('while True:\n    x = 1', 'py', [], { limite: 10000 }); if (r.error && /10\.000 pasos/.test(r.error.message)) bien++; else { mal++; console.log('✗ límite', r.error && r.error.message); } }
 console.log(`\n${bien} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

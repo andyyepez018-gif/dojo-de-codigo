@@ -240,6 +240,47 @@ const temas = [
   }
 ];
 
+/* Segundo ejercicio de cada tema (el primero está arriba, dentro de cada tema) */
+const EJERCICIOS_2 = {
+  salida: { enunciado: 'Muestra un cuadrado de asteriscos de 3 × 3, así:\n***\n***\n***',
+    pruebas: [{ entradas: [], salida: '***\n***\n***' }],
+    inicio: { ps: PS('Cuadrado', '// Muestra las tres filas'), py: '# Muestra las tres filas\n', cpp: C('// Muestra las tres filas') } },
+  variables: { enunciado: 'Guarda 5 en a y 9 en b. Intercambia sus valores usando una tercera variable y muestra a y después b, uno por línea. Tiene que salir:\n9\n5',
+    pruebas: [{ entradas: [], salida: '9\n5' }],
+    inicio: { ps: PS('Cambio', 'a <- 5\nb <- 9\n// Intercambia a y b con una variable aux'), py: 'a = 5\nb = 9\n# Intercambia a y b con una variable aux\n', cpp: C('int a = 5, b = 9;\n// Intercambia a y b con una variable aux') } },
+  operaciones: { enunciado: 'La variable n vale 47. Muestra su última cifra y, en la línea siguiente, la cifra de las decenas:\n7\n4',
+    pruebas: [{ entradas: [], salida: '7\n4' }],
+    inicio: { ps: PS('Cifras', 'n <- 47\n// Usa MOD y la división entera'), py: 'n = 47\n# Usa % y //\n', cpp: C('int n = 47;\n// Usa % y la división entre enteros') } },
+  leer: { enunciado: 'Pide el precio de un producto y la cantidad que se compra (dos números enteros) y muestra el total a pagar.',
+    pruebas: [{ entradas: ['25', '3'], salida: '75' }, { entradas: ['10', '0'], salida: '0' }],
+    inicio: { ps: PS('Total', 'Definir precio, cantidad Como Entero\n// Lee los dos datos y muestra el total'), py: '# Pide precio y cantidad y muestra el total\n', cpp: C('int precio, cantidad;\n// Lee los dos datos y muestra el total') } },
+  decisiones: { enunciado: 'Pide tres números enteros y muestra el mayor.',
+    pruebas: [{ entradas: ['3', '9', '5'], salida: '9' }, { entradas: ['7', '2', '1'], salida: '7' }, { entradas: ['4', '4', '8'], salida: '8' }, { entradas: ['5', '5', '5'], salida: '5' }],
+    inicio: { ps: PS('Mayor', 'Definir a, b, c Como Entero\nLeer a\nLeer b\nLeer c\n// Decide cuál es el mayor'), py: 'a = int(input())\nb = int(input())\nc = int(input())\n# Decide cuál es el mayor\n', cpp: C('int a, b, c;\ncin >> a >> b >> c;\n// Decide cuál es el mayor') } },
+  mientras: { enunciado: 'Pide números uno tras otro hasta que el usuario escriba 0. Al final muestra la suma de todos.',
+    pruebas: [{ entradas: ['5', '3', '2', '0'], salida: '10' }, { entradas: ['0'], salida: '0' }, { entradas: ['-4', '10', '0'], salida: '6' }],
+    inicio: { ps: PS('Suma', 'Definir n, suma Como Entero\nsuma <- 0\n// Repite hasta que llegue un 0'), py: 'suma = 0\n# Repite hasta que llegue un 0\n', cpp: C('int n, suma = 0;\n// Repite hasta que llegue un 0') } },
+  para: { enunciado: 'Pide un número n y muestra la suma de los números pares desde 2 hasta n.',
+    pruebas: [{ entradas: ['10'], salida: '30' }, { entradas: ['7'], salida: '12' }, { entradas: ['1'], salida: '0' }],
+    inicio: { ps: PS('Pares', 'Definir n, suma Como Entero\nLeer n\nsuma <- 0\n// Recorre los pares'), py: 'n = int(input())\nsuma = 0\n# Recorre los pares\n', cpp: C('int n, suma = 0;\ncin >> n;\n// Recorre los pares') } },
+  arreglos: { enunciado: 'Pide 5 números y muéstralos al revés, uno por línea (primero el último que se escribió).',
+    pruebas: [{ entradas: ['1', '2', '3', '4', '5'], salida: '5\n4\n3\n2\n1' }, { entradas: ['9', '0', '7', '0', '3'], salida: '3\n0\n7\n0\n9' }],
+    inicio: { ps: PS('Reves', 'Dimension a[5]\n// Lee los 5 números y muéstralos al revés'), py: '# Lee 5 números en una lista y muéstralos al revés\n', cpp: C('int a[5];\n// Lee los 5 números y muéstralos al revés') } },
+  funciones: { enunciado: 'Escribe una función es_primo(n) que diga si n es primo (solo se divide entre 1 y entre sí mismo; el 1 no es primo). Pide un número y muestra «primo» o «no primo» usando tu función.',
+    pruebas: [{ entradas: ['7'], salida: 'primo' }, { entradas: ['9'], salida: 'no primo' }, { entradas: ['2'], salida: 'primo' }, { entradas: ['1'], salida: 'no primo' }],
+    inicio: {
+      ps: '// Escribe aquí tu Funcion r <- es_primo(n)\n\n' + PS('Primos', 'Definir x Como Entero\nLeer x\n// Usa tu función'),
+      py: '# Escribe aquí tu función def es_primo(n):\n\n\nx = int(input())\n# Usa tu función\n',
+      cpp: '#include <iostream>\nusing namespace std;\n\n// Escribe aquí tu función bool es_primo(int n)\n\nint main() {\n    int x;\n    cin >> x;\n    // Usa tu función\n    return 0;\n}\n' } },
+  texto: { enunciado: 'Pide una palabra escrita en minúsculas y muestra cuántas vocales tiene (a, e, i, o, u).',
+    pruebas: [{ entradas: ['murcielago'], salida: '5' }, { entradas: ['rio'], salida: '2' }, { entradas: ['xyz'], salida: '0' }],
+    inicio: { ps: PS('Vocales', 'Definir s Como Caracter\nLeer s\n// Cuenta las vocales'), py: 's = input()\n# Cuenta las vocales\n', cpp: CS('string s;\ncin >> s;\n// Cuenta las vocales') } }
+};
+temas.forEach(t => {
+  t.ejercicios = [Object.assign({ id: t.id + '-1' }, t.ejercicio), Object.assign({ id: t.id + '-2' }, EJERCICIOS_2[t.id])];
+  delete t.ejercicio;
+});
+
 /* ───────────── Plantillas de retos ─────────────
    gen(r) → parámetros; ps/py/cpp(p) → código (fragmento: sin Algoritmo ni main);
    dis(p, lang) → salidas equivocadas típicas; explica(p, lang) → por qué sale lo que sale. */
@@ -633,6 +674,19 @@ function rng(semilla) {
   r.distintos = (arr, k) => r.shuffle(arr).slice(0, k);
   return r;
 }
+const TITULOS = {
+  'dos-lineas': 'Una orden, una línea', 'sin-salto': 'Mostrar sin saltar de línea', 'texto-o-cuenta': 'Texto entre comillas o cuenta', 'comas': 'Comas y espacios al mostrar',
+  'reasignar': 'Guardar un valor nuevo', 'cambio': 'Intercambiar dos variables', 'acumular': 'Cambiar una variable paso a paso', 'comillas': 'Variable o palabra',
+  'precedencia': 'Qué operación va primero', 'parentesis': 'Paréntesis en las cuentas', 'modulo': 'El resto (MOD / %)', 'division': 'La división en cada lenguaje', 'division-entera': 'División entera',
+  'leer-doble': 'Leer un número', 'input-texto': 'input() devuelve texto', 'saludo': 'Leer un nombre', 'suma-dos': 'Leer dos números',
+  'si-sino': 'Si / SiNo', 'y-o': 'Y / O en condiciones', 'notas': 'Varias opciones en cadena', 'dos-si': 'Dos decisiones separadas', 'par-impar': 'Par o impar',
+  'cuenta-atras': 'Cuenta atrás con Mientras', 'duplicar': 'Contar vueltas', 'digitos': 'Separar las cifras', 'repetir-una-vez': 'Repetir / do-while', 'mientras-nunca': 'Bucle que no entra',
+  'suma-1-n': 'Sumar de 1 a n', 'paso': 'Contar de 2 en 2 (paso)', 'range-cero': 'Empezar a contar en 0', 'anidados': 'Bucles dentro de bucles', 'factorial': 'Multiplicar acumulando', 'hacia-atras': 'Contar hacia atrás',
+  'indice': 'Posiciones de un arreglo', 'suma-lista': 'Sumar un arreglo', 'mayor': 'Buscar el mayor', 'agregar': 'Añadir al final', 'negativo': 'Índices negativos',
+  'doble': 'Llamar a una función', 'copia': 'Parámetros por valor', 'referencia': 'Parámetros por referencia', 'mayor-de-dos': 'Función con decisión', 'return-corta': 'return termina la función',
+  'longitud': 'Longitud de un texto', 'mayusculas': 'Pasar a mayúsculas', 'concatenar': 'Unir textos', 'subcadena': 'Sacar un trozo de texto', 'contar-letra': 'Recorrer un texto'
+};
+plantillas.forEach(t => { t.titulo = TITULOS[t.id] || t.id; });
 const limpia = s => String(s).split('\n').map(l => l.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '');
 const porId = {}; plantillas.forEach(t => { porId[t.id] = t; });
 const langsDe = t => t.solo || ['ps', 'py', 'cpp'];
@@ -698,10 +752,14 @@ function generar(spec) {
   if (base.error) throw new Error(`La plantilla ${t.id} (${lang}) falla: ${base.error.message}`);
   const reto = { spec: { ...spec }, tema: t.tema, lang, codigo, entradas, salida: base.salida, explica: t.explica(p, lang), tipo: spec.tipo };
   const conTipo = tipo => { reto.tipo = tipo; reto.spec.tipo = tipo; };
-  if (spec.tipo === 'hueco') { const h = hueco(reto, r); if (h) return Object.assign(reto, h); conTipo('salida'); }
-  if (spec.tipo === 'ordenar') { const o = ordenar(reto, r); if (o) return Object.assign(reto, o); conTipo('salida'); }
-  if (spec.tipo === 'error') { const e = error(reto, r); if (e) return Object.assign(reto, e); conTipo('salida'); }
-  if (spec.tipo === 'traducir') { const x = traducir(reto, t, p, spec, r); if (x) return Object.assign(reto, x); conTipo('salida'); }
+  const arma = { hueco: () => hueco(reto, r), ordenar: () => ordenar(reto, r), error: () => error(reto, r), traducir: () => traducir(reto, t, p, spec, r) };
+  if (spec.tipo !== 'salida') {
+    // Si la clase pedida no encaja con este programa (p. ej. dos líneas no se pueden ordenar), se prueba
+    // otra que sí encaje antes de caer en «¿Qué muestra?»: así los retos no se repiten.
+    const orden = [spec.tipo, ...['error', 'traducir', 'hueco', 'ordenar'].filter(x => x !== spec.tipo)];
+    for (const tipo of spec.estricto ? [spec.tipo] : orden) { const x = arma[tipo] && arma[tipo](); if (x) { conTipo(tipo); return Object.assign(reto, x); } }
+    conTipo('salida');
+  }
   const opc = r.shuffle([reto.salida, ...distractoresSalida(t, p, lang, reto.salida, r)]);
   return Object.assign(reto, { opciones: opc, correcta: opc.indexOf(reto.salida) });
 }
@@ -745,6 +803,7 @@ function compruebaOrden(reto, textos) {
   return { ok: !res.error && res.salida === reto.salida, salida: res.salida, error: res.error };
 }
 function error(reto, r) {
+  if (reto.codigo.split('\n').filter(l => l.trim()).length < 2) return null;   // con una sola línea no hay nada que buscar
   for (const mu of r.shuffle(mutaciones(reto.codigo, reto.lang))) {
     const ls = reto.codigo.split('\n'); ls[mu.i] = mu.nueva; const cod = ls.join('\n');
     const res = ejecuta(cod, reto.lang, reto.entradas);
@@ -795,6 +854,8 @@ function compruebaEjercicio(codigo, lang, pruebas) {
   });
 }
 
-raiz.Dojo = { compruebaEjercicio, temas, plantillas, html, porId, langsDe, generar, compruebaOrden, completo, limpia, rng, TIPOS, NOMBRE_TIPO, NOMBRE_LANG: L };
+const ejercicioPorId = id => { for (const t of temas) for (const e of t.ejercicios) if (e.id === id) return { tema: t, ej: e }; return null; };
+
+raiz.Dojo = { compruebaEjercicio, ejercicioPorId, temas, plantillas, html, porId, langsDe, generar, compruebaOrden, completo, limpia, rng, TIPOS, NOMBRE_TIPO, NOMBRE_LANG: L };
 if (typeof module !== 'undefined' && module.exports) module.exports = raiz.Dojo;
 })(typeof window !== 'undefined' ? window : globalThis);

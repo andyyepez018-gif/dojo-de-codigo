@@ -11,6 +11,8 @@ class Real { constructor(v) { this.v = v; } }
 const R = v => new Real(v);
 const esR = x => x instanceof Real;
 class Car { constructor(c) { this.c = c; } }   // un char de C++
+class Dic { constructor() { this.m = new Map(); } }   // un diccionario de Python (conserva el orden)
+class Manip { constructor(tipo, n) { this.tipo = tipo; this.n = n; } }   // fixed, setprecision(n), setw(n)…
 const esNum = x => typeof x === 'number' || x instanceof Real || typeof x === 'boolean' || x instanceof Car;
 const N = x => (x instanceof Real ? x.v : typeof x === 'boolean' ? (x ? 1 : 0) : x instanceof Car ? x.c.charCodeAt(0) : x);
 const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -160,6 +162,7 @@ function leerPy(src) {
 }
 function dosPuntosPy(P, que) {
   if (P.tomaOp(':')) return;
+  if (que === 'else' && P.esId('if')) throw P.err('En Python no existe «else if»: se escribe «elif».', 'Así:  elif x > 1:');
   if (P.esOp('=')) throw P.err('Para comparar se usan dos iguales: «==».', 'Un solo «=» guarda un valor; «==» pregunta si dos cosas son iguales.');
   throw new ErrorDojo(`Falta «:» al final de la línea del ${que}.`, P.previa().linea, 'En Python, if, elif, else, for, while y def terminan siempre con dos puntos.');
 }
@@ -234,6 +237,7 @@ function simplePy(P) {
     if (t.v === 'break') { P.sig(); return { k: 'break', linea: L }; }
     if (t.v === 'continue') { P.sig(); return { k: 'cont', linea: L }; }
     if (t.v === 'pass') { P.sig(); return { k: 'pass', linea: L }; }
+    if (t.v === 'del') { P.sig(); const ts = []; do { const x = postPy(P); if (x.k !== 'idx') throw P.err('del se usa para borrar un elemento:  del lista[0]  o  del d["clave"]'); ts.push(x); } while (P.tomaOp(',')); return { k: 'borrar', ts, linea: L }; }
     if (t.v === 'global') { P.sig(); const ns = []; do { ns.push(P.sig().v); } while (P.tomaOp(',')); return { k: 'global', ns, linea: L }; }
     if (t.v === 'import') { P.sig(); do { P.sig(); } while (P.tomaOp(',')); return { k: 'pass', linea: L }; }
     if (t.v === 'from') { P.sig(); P.sig(); if (!P.tomaId('import')) throw P.err('Falta «import».'); const ns = []; do { ns.push(P.sig().v); } while (P.tomaOp(',')); return { k: 'importa', ns, linea: L }; }
@@ -282,12 +286,20 @@ function sumPy(P) { let a = mulPy(P); while (P.esOp('+') || P.esOp('-')) { const
 function mulPy(P) { let a = unPy(P); while (P.esOp('*') || P.esOp('/') || P.esOp('//') || P.esOp('%')) { const t = P.sig(); a = { k: 'bin', op: t.v, a, b: unPy(P), linea: t.linea }; } return a; }
 function unPy(P) { if (P.esOp('-') || P.esOp('+')) { const t = P.sig(); return { k: 'un', op: t.v, a: unPy(P), linea: t.linea }; } return powPy(P); }
 function powPy(P) { const a = postPy(P); if (P.esOp('**')) { const t = P.sig(); return { k: 'bin', op: '**', a, b: unPy(P), linea: t.linea }; } return a; }
+function comprensionPy(P, e, L) {
+  P.sig(); const vs = [];
+  do { const v = P.sig(); if (v.t !== 'id') throw P.err('Después de «for» va el nombre de una variable.', '', v); vs.push({ k: 'var', n: v.v, id: v.v, linea: L }); } while (P.tomaOp(','));
+  if (!P.tomaId('in')) throw P.err('Falta «in»:  [x for x in lista]');
+  const iter = orPy(P); let cond = null;
+  if (P.tomaId('if')) cond = orPy(P);
+  return { k: 'compr', e, v: vs.length === 1 ? vs[0] : { k: 'tupla', els: vs, linea: L }, iter, cond, linea: L };
+}
 function argsPy(P) {
   const pos = [], kw = {};
   while (!P.esOp(')')) {
     if (P.t.t === 'eof' || P.t.t === 'nl') throw P.err('Falta cerrar el paréntesis «)».');
     if (P.t.t === 'id' && P.mira(1).t === 'op' && P.mira(1).v === '=') { const n = P.sig().v; P.sig(); kw[n] = exprPy(P); }
-    else pos.push(exprPy(P));
+    else { const x = exprPy(P); pos.push(P.esId('for') ? comprensionPy(P, x, x.linea) : x); }
     if (!P.tomaOp(',')) break;
   }
   P.pideOp(')', 'Falta cerrar el paréntesis «)».', 'Cada «(» necesita su «)».');
@@ -322,14 +334,30 @@ function atomoPy(P) {
   }
   if (P.esOp('(')) {
     P.sig(); if (P.tomaOp(')')) return { k: 'tupla', els: [], linea: L };
-    const e = exprPy(P);
+    let e = exprPy(P);
+    if (P.esId('for')) e = comprensionPy(P, e, L);
     if (P.esOp(',')) { const els = [e]; while (P.tomaOp(',')) { if (P.esOp(')')) break; els.push(exprPy(P)); } P.pideOp(')', 'Falta cerrar el paréntesis «)».'); return { k: 'tupla', els, linea: L }; }
     P.pideOp(')', 'Falta cerrar el paréntesis «)».', 'Cada «(» necesita su «)».'); return e;
   }
   if (P.esOp('[')) {
     P.sig(); const els = [];
-    while (!P.esOp(']')) { if (P.t.t === 'eof') throw P.err('Falta cerrar el corchete «]».'); els.push(exprPy(P)); if (!P.tomaOp(',')) break; }
+    while (!P.esOp(']')) {
+      if (P.t.t === 'eof') throw P.err('Falta cerrar el corchete «]».');
+      const x = exprPy(P);
+      if (!els.length && P.esId('for')) { const c = comprensionPy(P, x, L); P.pideOp(']', 'Falta cerrar el corchete «]».'); return c; }
+      els.push(x); if (!P.tomaOp(',')) break;
+    }
     P.pideOp(']', 'Falta cerrar el corchete «]».'); return { k: 'lista', els, linea: L };
+  }
+  if (P.esOp('{')) {
+    P.sig(); const pares = [];
+    while (!P.esOp('}')) {
+      if (P.t.t === 'eof') throw P.err('Falta cerrar la llave «}».');
+      const k = exprPy(P);
+      if (!P.tomaOp(':')) throw P.err('En un diccionario cada clave lleva «:» y su valor:  {"edad": 20}', 'Los conjuntos {1, 2, 3} no están disponibles en este laboratorio.');
+      pares.push([k, exprPy(P)]); if (!P.tomaOp(',')) break;
+    }
+    P.pideOp('}', 'Falta cerrar la llave «}».'); return { k: 'dic', pares, linea: L };
   }
   if (t.t === 'nl' || t.t === 'eof') throw P.err('La línea termina antes de tiempo: falta algo al final.', 'Por ejemplo, el valor después de un «=» o de un operador.');
   if (P.esOp('=')) throw P.err('Aquí sobra un «=».', '¿Querías comparar? Entonces es «==».');
@@ -599,7 +627,7 @@ function tipoCpp(P) {
   return { base };
 }
 function leerCpp(src) {
-  const P = new Lector(escanear(src, 'cpp'), 'cpp');
+  const P = new Lector(escanear(src, 'cpp'), 'cpp'); P.avisos = [];
   const funcs = [], cuerpo = [];
   while (P.t.t !== 'eof') {
     if (P.esId('using')) { while (!P.esOp(';') && P.t.t !== 'eof') P.sig(); P.tomaOp(';'); continue; }
@@ -610,7 +638,7 @@ function leerCpp(src) {
     }
     cuerpo.push(stmtCpp(P));
   }
-  return { cuerpo, funcs };
+  return { cuerpo, funcs, avisos: P.avisos };
 }
 function esDefFuncion(P) {
   let j = P.p + 2, prof = 1;
@@ -646,6 +674,8 @@ function condCpp(P, que, L) {
   if (!P.tomaOp('(')) throw new ErrorDojo(`Falta «(»: en C++ la condición del ${que} va entre paréntesis.`, L, `Por ejemplo: ${que} (x > 5)`);
   const c = exprCpp(P);
   if (!P.tomaOp(')')) throw new ErrorDojo(`Falta «)» al cerrar la condición del ${que}.`, P.previa().linea, 'Cada «(» necesita su «)».');
+  if (P.avisos && c.k === 'asigx' && c.op === '=') P.avisos.push({ linea: L, texto: `En la condición del ${que} hay un solo «=», que GUARDA un valor. Para comparar se usa «==».` });
+  if (P.avisos && P.esOp(';') && que !== 'do') P.avisos.push({ linea: L, texto: `El «;» justo después del ${que} (...) lo termina ahí: ${que === 'while' ? 'el bucle no repite nada y puede no acabar nunca' : 'lo de abajo se ejecuta siempre'}.` });
   return c;
 }
 function stmtCpp(P) {
@@ -663,7 +693,7 @@ function stmtCpp(P) {
     case 'do': {
       P.sig(); const cu = stmtCpp(P);
       if (!P.tomaId('while')) throw P.err('Falta «while (condición);» después del do { }.');
-      const c = condCpp(P, 'while', P.previa().linea); finCpp(P);
+      const c = condCpp(P, 'do', P.previa().linea); finCpp(P);
       return { k: 'repetir', cuerpo: [cu], c, hasta: false, linea: L };
     }
     case 'for': {
@@ -803,12 +833,13 @@ function reprFloat(x) {
   if (Number.isInteger(x)) return x.toFixed(1);
   return String(x);
 }
-function fmtG(x) {
+function fmtG(x, prec = 6) {
   if (!isFinite(x)) return isNaN(x) ? 'nan' : (x > 0 ? 'inf' : '-inf');
   if (x === 0) return '0';
-  const [m0, ex] = x.toExponential(5).split('e'); const exp = parseInt(ex, 10);
-  if (exp < -4 || exp >= 6) { const m = m0.includes('.') ? m0.replace(/\.?0+$/, '') : m0; return m + 'e' + (exp < 0 ? '-' : '+') + String(Math.abs(exp)).padStart(2, '0'); }
-  let f = x.toFixed(Math.max(0, 5 - exp)); if (f.includes('.')) f = f.replace(/\.?0+$/, ''); return f;
+  const p = Math.max(1, prec);
+  const [m0, ex] = x.toExponential(p - 1).split('e'); const exp = parseInt(ex, 10);
+  if (exp < -4 || exp >= p) { const m = m0.includes('.') ? m0.replace(/\.?0+$/, '') : m0; return m + 'e' + (exp < 0 ? '-' : '+') + String(Math.abs(exp)).padStart(2, '0'); }
+  let f = x.toFixed(Math.max(0, p - 1 - exp)); if (f.includes('.')) f = f.replace(/\.?0+$/, ''); return f;
 }
 function fmtPs(x) {
   if (Number.isInteger(x)) return String(x);
@@ -822,6 +853,7 @@ function textoDe(v, lang) {
   if (v === null) return lang === 'py' ? 'None' : '';
   if (v instanceof Real) return lang === 'py' ? reprFloat(v.v) : lang === 'cpp' ? fmtG(v.v) : fmtPs(v.v);
   if (typeof v === 'number') return lang === 'ps' ? fmtPs(v) : String(v);
+  if (v instanceof Dic) return '{' + [...v.m.values()].map(([k, x]) => reprPy(k) + ': ' + reprPy(x)).join(', ') + '}';
   if (Array.isArray(v) && lang === 'py') {
     if (v.rango) return v.rango;
     const dentro = v.map(x => reprPy(x)).join(', ');
@@ -839,7 +871,8 @@ function nombreTipo(v, lang) {
   if (typeof v === 'boolean') return lang === 'ps' ? 'lógico' : 'booleano';
   if (v instanceof Real) return lang === 'py' ? 'decimal (float)' : lang === 'ps' ? 'número' : 'decimal (double)';
   if (typeof v === 'number') return lang === 'py' ? 'entero (int)' : lang === 'ps' ? 'número' : 'entero (int)';
-  if (Array.isArray(v)) return lang === 'py' ? 'lista' : lang === 'ps' ? 'arreglo' : 'arreglo';
+  if (Array.isArray(v)) return lang === 'py' ? (v.tupla ? 'tupla' : 'lista') : lang === 'ps' ? 'arreglo' : 'arreglo';
+  if (v instanceof Dic) return 'diccionario (dict)';
   if (v === null) return 'None';
   return 'valor';
 }
@@ -884,20 +917,74 @@ function nombreExpr(e) {
   return 'esto';
 }
 const RE_NUM = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+const MAX_TRAZA = 3000;
+function claveDic(k, L) {
+  if (typeof k === 'string') return 's' + k;
+  if (esNum(k)) return 'n' + N(k);
+  if (k === null) return 'none';
+  if (Array.isArray(k) && k.tupla) return 't' + k.map(x => claveDic(x, L)).join('\u0001');
+  throw new ErrorDojo(`Un${Array.isArray(k) ? 'a lista' : ' diccionario'} no puede ser la clave de un diccionario (TypeError).`, L, 'Las claves suelen ser textos o números:  d["nombre"] = "Ana"');
+}
+function nombreClasePy(x) {
+  return x === null ? 'NoneType' : typeof x === 'boolean' ? 'bool' : typeof x === 'string' ? 'str' : esR(x) ? 'float' : typeof x === 'number' ? 'int' : x instanceof Dic ? 'dict' : Array.isArray(x) ? (x.tupla ? 'tuple' : 'list') : 'function';
+}
 
 class Maquina {
-  constructor(prog, lang) {
+  constructor(prog, lang, opciones = {}) {
     this.prog = prog; this.lang = lang; this.out = []; this.eventos = []; this.pasos = 0; this.prof = 0;
     this.funcs = new Map(); this.globales = new Ambito(null); this.buf = ''; this.linea = 0; this.importados = new Set();
+    this.limite = opciones.limite || LIMITE_PASOS; this.traza = opciones.traza ? [] : null; this.trazaCortada = false;
+    this.pila = []; this.nSalida = 0; this.pausas = !!opciones.pausas; this.maxSalida = opciones.maxSalida || 200000; this.declarados = new Set(); this.cout = { fixed: false, prec: 6, ancho: 0, izq: false };
+  }
+  /* Paso a paso: una foto de la línea, las variables visibles y cuánto se había mostrado */
+  marca(linea, amb) {
+    if (!this.traza) return;
+    if (this.traza.length >= MAX_TRAZA) { this.trazaCortada = true; return; }
+    this.traza.push({ linea, vars: this.instantanea(amb), salida: this.nSalida, pila: this.pila.slice() });
+  }
+  instantanea(amb) {
+    const vars = [], vistos = new Set();
+    const mete = (c, donde) => { if (vistos.has(c.n)) return; vistos.add(c.n); vars.push({ n: c.n, v: this.muestra(c.v), t: this.tipoCorto(c), donde }); };
+    if (this.lang === 'py') { if (amb !== this.globales) for (const c of amb.m.values()) mete(c, 'local'); for (const c of this.globales.m.values()) mete(c, amb !== this.globales ? 'global' : ''); }
+    else if (this.lang === 'ps') for (const c of amb.m.values()) mete(c, '');
+    else { let a = amb; while (a) { for (const c of a.m.values()) mete(c, a === this.globales && amb !== this.globales ? 'global' : ''); a = a.padre; } }
+    return vars;
+  }
+  muestra(v, prof = 0) {
+    if (v === undefined) return '?';
+    if (typeof v === 'string') return this.lang === 'py' ? reprPy(v) : '"' + v + '"';
+    if (v instanceof Car) return "'" + v.c + "'";
+    if (Array.isArray(v)) {
+      const xs = v.slice(0, 40).map(x => prof > 2 ? '…' : this.muestra(x, prof + 1)); if (v.length > 40) xs.push('…');
+      return this.lang === 'cpp' ? '{' + xs.join(', ') + '}' : v.tupla ? '(' + xs.join(', ') + (v.length === 1 ? ',' : '') + ')' : '[' + xs.join(', ') + ']';
+    }
+    if (v instanceof Dic) return '{' + [...v.m.values()].slice(0, 30).map(([k, x]) => this.muestra(k, prof + 1) + ': ' + this.muestra(x, prof + 1)).join(', ') + (v.m.size > 30 ? ', …' : '') + '}';
+    if (v && v.fn) return 'función ' + v.fn.n;
+    return textoDe(v, this.lang);
+  }
+  tipoCorto(c) {
+    if (this.lang === 'ps') return c.dims ? 'arreglo' : ({ entero: 'Entero', real: 'Real', texto: 'Caracter', logico: 'Logico' })[c.tipo] || '';
+    if (this.lang === 'py') return c.v === undefined ? '' : nombreClasePy(c.v);
+    const t = c.tipo; if (!t) return '';
+    const nom = x => x.base === 'vector' ? `vector<${nom(x.elem)}>` : x.base;
+    return nom(t) + (t.dims ? t.dims.map(d => `[${d}]`).join('') : '');
+  }
+  iterable(it, L, vivo) {
+    if (typeof it === 'string') return [...it];
+    if (Array.isArray(it)) return vivo ? it : it.slice();
+    if (it instanceof Dic) return [...it.m.values()].map(par => par[0]);
+    throw new ErrorDojo(`Un ${nombreTipo(it, this.lang)} no se puede recorrer.`, L, this.lang === 'py' && esNum(it) ? 'Para contar hasta un número usa range:  for i in range(n):' : 'Se recorre un texto, una lista o un diccionario.');
   }
   escribe(s) {
-    if (!s) return; this.out.push(s);
+    if (!s) return;
+    if (this.nSalida + s.length > this.maxSalida) throw new ErrorDojo(`El programa mostró más de ${this.maxSalida.toLocaleString('es-ES')} letras y lo detuve.`, this.linea, '¿Hay un bucle que muestra algo sin parar?');
+    this.out.push(s); this.nSalida += s.length;
     const u = this.eventos[this.eventos.length - 1];
     if (u && u.t === 'out') u.s += s; else this.eventos.push({ t: 'out', s });
   }
   *pideLinea() { const v = yield { pide: true }; const s = v == null ? '' : String(v); this.eventos.push({ t: 'in', s }); return s; }
   paso(L) {
-    if (++this.pasos > LIMITE_PASOS) throw new ErrorDojo('El programa dio más de 300.000 pasos y lo detuve. ¿Hay un bucle que nunca termina?', L || this.linea, 'Revisa que dentro del bucle cambie algo que haga falsa la condición alguna vez.');
+    if (++this.pasos > this.limite) throw new ErrorDojo(`El programa dio más de ${this.limite.toLocaleString('es-ES')} pasos y lo detuve. ¿Hay un bucle que nunca termina?`, L || this.linea, 'Revisa que dentro del bucle cambie algo que haga falsa la condición alguna vez.');
   }
   *correr() {
     const p = this.prog, L = this.lang;
@@ -925,8 +1012,18 @@ class Maquina {
   }
   *exec(s, amb) {
     this.paso(s.linea); this.linea = s.linea;
+    if (this.traza && s.k !== 'bloque') this.marca(s.linea, amb);
+    if (this.pausas && this.pasos % 25000 === 0) yield { pausa: true };
     switch (s.k) {
       case 'pass': return;
+      case 'borrar':
+        for (const t of s.ts) {
+          const obj = yield* this.ev(t.obj, amb); const i = yield* this.ev(t.is[0], amb);
+          if (obj instanceof Dic) { const k = claveDic(i, s.linea); if (!obj.m.has(k)) throw new ErrorDojo(`La clave ${reprPy(i)} no está en el diccionario (KeyError).`, s.linea); obj.m.delete(k); }
+          else if (Array.isArray(obj)) obj.splice(this.posicion(obj, i, t), 1);
+          else throw new ErrorDojo('del borra un elemento de una lista o de un diccionario.', s.linea);
+        }
+        return;
       case 'expr': yield* this.ev(s.e, amb); return;
       case 'asig': {
         if (s.op === '=') { const v = yield* this.ev(s.e, amb); for (const t of s.ts) yield* this.asignar(t, v, amb, s.linea); return; }
@@ -969,7 +1066,7 @@ class Maquina {
       case 'si': { const c = yield* this.ev(s.c, amb); if (this.verdad(c, s.linea)) yield* this.bloque(s.a, amb); else if (s.b) yield* this.bloque(s.b, amb); return; }
       case 'bloque': yield* this.bloque(s.cuerpo, new Ambito(amb)); return;
       case 'mientras':
-        for (;;) { this.paso(s.linea); const c = yield* this.ev(s.c, amb); if (!this.verdad(c, s.linea)) break; if ((yield* this.vuelta(s.cuerpo, amb)) === 'break') break; }
+        for (let vuelta = 0; ; vuelta++) { this.paso(s.linea); if (vuelta) this.marca(s.linea, amb); const c = yield* this.ev(s.c, amb); if (!this.verdad(c, s.linea)) break; if ((yield* this.vuelta(s.cuerpo, amb)) === 'break') break; }
         return;
       case 'repetir':
         for (;;) {
@@ -983,8 +1080,8 @@ class Maquina {
         if (!esNum(ini) || !esNum(fin) || !esNum(pa)) throw new ErrorDojo('El Para cuenta con números: revisa el inicio, el final y el paso.', s.linea);
         const p = N(pa); if (p === 0) throw new ErrorDojo('El paso del Para no puede ser 0.', s.linea);
         let i = N(ini); const f = N(fin);
-        while (p > 0 ? i <= f : i >= f) {
-          this.paso(s.linea); yield* this.asignar(s.v, i, amb, s.linea);
+        for (let vuelta = 0; p > 0 ? i <= f : i >= f; vuelta++) {
+          this.paso(s.linea); if (vuelta) this.marca(s.linea, amb); yield* this.asignar(s.v, i, amb, s.linea);
           if ((yield* this.vuelta(s.cuerpo, amb)) === 'break') break;
           i = N(yield* this.ev(s.v, amb)) + p;
         }
@@ -992,12 +1089,10 @@ class Maquina {
       }
       case 'paracada': {
         const it = yield* this.ev(s.iter, amb);
-        let lista;
-        if (typeof it === 'string') lista = [...it];
-        else if (Array.isArray(it)) lista = it;
-        else throw new ErrorDojo(`Un ${nombreTipo(it, this.lang)} no se puede recorrer con for.`, s.linea, this.lang === 'py' && esNum(it) ? 'Para contar hasta un número usa range:  for i in range(n):' : 'Se recorre un texto o una lista.');
+        const lista = this.iterable(it, s.linea, true);
+        if (s.decl) this.declarados.add(s.v.n);
         for (let k = 0; k < lista.length; k++) {
-          this.paso(s.linea); let sc = amb;
+          this.paso(s.linea); if (k) this.marca(s.linea, amb); let sc = amb;
           if (this.lang === 'cpp') {
             sc = new Ambito(amb);
             if (s.ref && Array.isArray(it)) { const arr = it, kk = k; sc.m.set(s.v.id, { n: s.v.n, tipo: s.tipo, get v() { return arr[kk]; }, set v(x) { arr[kk] = x; } }); }
@@ -1010,8 +1105,8 @@ class Maquina {
       case 'forc': {
         const sc = new Ambito(amb);
         if (s.init) yield* this.exec(s.init, sc);
-        for (;;) {
-          this.paso(s.linea);
+        for (let vuelta = 0; ; vuelta++) {
+          this.paso(s.linea); if (vuelta) this.marca(s.linea, sc);
           if (s.c && !this.verdad(yield* this.ev(s.c, sc), s.linea)) break;
           if ((yield* this.vuelta(s.cuerpo, sc)) === 'break') break;
           if (s.upd) yield* this.ev(s.upd, sc);
@@ -1046,6 +1141,7 @@ class Maquina {
   *declarar(s, amb) {
     const tipo = s.tipo;
     for (const d of s.ds) {
+      this.declarados.add(d.n);
       if (amb.m.has(d.id)) throw new ErrorDojo(`La variable «${d.n}» ya está declarada aquí.`, d.linea, `Para cambiar su valor no repitas el tipo: escribe solo  ${d.n} = ...;`);
       if (d.dims) {
         const dims = [];
@@ -1152,13 +1248,19 @@ class Maquina {
       return c.v;
     }
     if (this.lang === 'py' && this.funcs.has(e.id)) return { fn: this.funcs.get(e.id) };
-    if (this.lang === 'cpp') { if (e.id === 'cout') return FLUJO_COUT; if (e.id === 'cin') return FLUJO_CIN; if (e.id === 'endl') return ENDL; if (e.id === 'M_PI') return R(Math.PI); }
+    if (this.lang === 'cpp') {
+      if (e.id === 'cout') return FLUJO_COUT; if (e.id === 'cin') return FLUJO_CIN; if (e.id === 'endl') return ENDL; if (e.id === 'M_PI') return R(Math.PI);
+      if (e.id === 'fixed') return new Manip('fixed'); if (e.id === 'left') return new Manip('izq'); if (e.id === 'right') return new Manip('der');
+    }
     if (this.lang === 'ps' && e.id === 'pi') return Math.PI;
     const sug = parecido(e.n, this.nombresVisibles(amb));
     if (this.lang === 'py') throw new ErrorDojo(`«${e.n}» no existe: no hay ninguna variable con ese nombre (NameError).`, L, sug ? `¿Quisiste decir «${sug}»?` : 'Dale un valor antes de usarla, o revisa cómo la escribiste (las mayúsculas cuentan). Si es un texto, va entre comillas.');
     if (this.lang === 'ps') throw new ErrorDojo(`La variable «${e.n}» todavía no tiene valor.`, L, sug ? `¿Quisiste decir «${sug}»?` : 'Dale un valor con «<-» o con Leer antes de usarla. Si es un texto, va entre comillas.');
     if (e.id === 'print' || e.id === 'printf') throw new ErrorDojo('En C++ se muestra con cout.', L, 'Así:  cout << "hola" << endl;');
-    throw new ErrorDojo(`La variable «${e.n}» no está declarada.`, L, sug ? `¿Quisiste decir «${sug}»?` : `Declárala antes con su tipo, por ejemplo  int ${e.n} = 0;  (si es un texto, va entre comillas dobles).`);
+    throw new ErrorDojo(`La variable «${e.n}» no está declarada.`, L, this.pistaAlcance(e.n) || (sug ? `¿Quisiste decir «${sug}»?` : `Declárala antes con su tipo, por ejemplo  int ${e.n} = 0;  (si es un texto, va entre comillas dobles).`));
+  }
+  pistaAlcance(n) {
+    return this.declarados.has(n) ? `«${n}» existía dentro de un bloque (unas llaves { } o un for) que ya terminó. Una variable solo vive dentro del bloque donde se declara: si la necesitas después, declárala antes, fuera del bloque.` : '';
   }
   tipoDestino(t, amb) {
     if (t.k === 'var') { const c = this.celda(t, amb); return c ? c.tipo : null; }
@@ -1187,7 +1289,7 @@ class Maquina {
       c.v = this.compruebaPs(c.tipo, v, L, t.n); return;
     }
     const c = amb.busca(t.id);
-    if (!c) { const sug = parecido(t.n, this.nombresVisibles(amb)); throw new ErrorDojo(`La variable «${t.n}» no está declarada.`, L, sug ? `¿Quisiste decir «${sug}»?` : `En C++ hay que declararla antes con su tipo, por ejemplo:  int ${t.n} = 0;`); }
+    if (!c) { const sug = parecido(t.n, this.nombresVisibles(amb)); throw new ErrorDojo(`La variable «${t.n}» no está declarada.`, L, this.pistaAlcance(t.n) || (sug ? `¿Quisiste decir «${sug}»?` : `En C++ hay que declararla antes con su tipo, por ejemplo:  int ${t.n} = 0;`)); }
     c.v = this.coerce(c.tipo, v, L);
   }
   *asignar(t, v, amb, L) {
@@ -1201,6 +1303,7 @@ class Maquina {
     }
     if (t.k === 'idx') {
       const obj = yield* this.ev(t.obj, amb); const is = []; for (const e of t.is) is.push(yield* this.ev(e, amb));
+      if (obj instanceof Dic) { obj.m.set(claveDic(is[0], L), [is[0], v]); return; }
       if (typeof obj === 'string') {
         if (this.lang === 'cpp') { const k = this.posicion(obj, is[0], t); const ch = this.coerce({ base: 'char' }, v, L).c; yield* this.asignar(t.obj, obj.slice(0, k) + ch + obj.slice(k + 1), amb, L); return; }
         throw new ErrorDojo(this.lang === 'py' ? 'En Python no se puede cambiar una letra de un texto: los textos no se modifican.' : 'No se puede cambiar una letra así.', L, this.lang === 'py' ? 'Crea un texto nuevo, por ejemplo:  s = s[:i] + "x" + s[i+1:]' : '');
@@ -1233,6 +1336,11 @@ class Maquina {
   indexar(o, is, e) {
     const L = e.linea; let v = o;
     for (const i of is) {
+      if (v instanceof Dic) {
+        const k = claveDic(i, L);
+        if (!v.m.has(k)) throw new ErrorDojo(`La clave ${reprPy(i)} no está en el diccionario (KeyError).`, L, 'Puedes comprobarlo antes con  if clave in d:  o usar  d.get(clave, valor_por_defecto).');
+        v = v.m.get(k)[1]; continue;
+      }
       if (typeof v === 'string') {
         if (this.lang === 'ps') throw new ErrorDojo('En PSeInt las letras de un texto se sacan con Subcadena(texto, desde, hasta).', L);
         const k = this.posicion(v, i, e); v = this.lang === 'cpp' ? new Car(v[k]) : v[k]; continue;
@@ -1244,7 +1352,7 @@ class Maquina {
     return v;
   }
   verdad(v, L) {
-    if (this.lang === 'py') { if (v === null || v === false || v === 0 || v === '') return false; if (v instanceof Real) return v.v !== 0; if (Array.isArray(v)) return v.length > 0; return true; }
+    if (this.lang === 'py') { if (v === null || v === false || v === 0 || v === '') return false; if (v instanceof Real) return v.v !== 0; if (Array.isArray(v)) return v.length > 0; if (v instanceof Dic) return v.m.size > 0; return true; }
     if (typeof v === 'boolean') return v;
     if (this.lang === 'ps') throw new ErrorDojo('La condición tiene que ser verdadera o falsa, por ejemplo  x > 5.', L, esNum(v) ? 'Para comparar se usa «=», «<», «>»… y los valores lógicos se unen con Y / O.' : '');
     if (esNum(v)) return N(v) !== 0;
@@ -1255,6 +1363,7 @@ class Maquina {
     if (b instanceof Car && typeof a === 'string') return a === b.c;
     if (esNum(a) && esNum(b)) return N(a) === N(b);
     if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, k) => this.igual(x, b[k]));
+    if (a instanceof Dic && b instanceof Dic) return a.m.size === b.m.size && [...a.m].every(([k, par]) => b.m.has(k) && this.igual(par[1], b.m.get(k)[1]));
     return a === b;
   }
   compara(op, a, b, L) {
@@ -1262,7 +1371,8 @@ class Maquina {
     if (op === '!=') return !this.igual(a, b);
     if (op === 'in' || op === 'notin') {
       let r;
-      if (typeof b === 'string') { if (typeof a !== 'string') throw new ErrorDojo('Para buscar dentro de un texto, lo que buscas también tiene que ser texto.', L); r = b.includes(a); }
+      if (b instanceof Dic) r = b.m.has(claveDic(a, L));
+      else if (typeof b === 'string') { if (typeof a !== 'string') throw new ErrorDojo('Para buscar dentro de un texto, lo que buscas también tiene que ser texto.', L); r = b.includes(a); }
       else if (Array.isArray(b)) r = b.some(x => this.igual(x, a));
       else throw new ErrorDojo('«in» busca dentro de un texto o de una lista.', L);
       return op === 'in' ? r : !r;
@@ -1329,6 +1439,12 @@ class Maquina {
         return s;
       }
       case 'lista': case 'tupla': { const a = yield* this.evArgs(e.els, amb); if (e.k === 'tupla') a.tupla = true; return a; }
+      case 'dic': { const d = new Dic(); for (const [ke, ve] of e.pares) { const k = yield* this.ev(ke, amb); d.m.set(claveDic(k, e.linea), [k, yield* this.ev(ve, amb)]); } return d; }
+      case 'compr': {
+        const lista = this.iterable(yield* this.ev(e.iter, amb), e.linea); const r = [];
+        for (const x of lista) { this.paso(e.linea); yield* this.asignar(e.v, x, amb, e.linea); if (e.cond && !this.verdad(yield* this.ev(e.cond, amb), e.linea)) continue; r.push(yield* this.ev(e.e, amb)); }
+        return r;
+      }
       case 'idx': { const o = yield* this.ev(e.obj, amb); const is = yield* this.evArgs(e.is, amb); return this.indexar(o, is, e); }
       case 'corte': {
         const o = yield* this.ev(e.obj, amb);
@@ -1390,10 +1506,19 @@ class Maquina {
     if (izq === FLUJO_COUT) {
       if (e.op !== '<<') throw new ErrorDojo('Con cout se usa «<<»: las flechas apuntan hacia cout.', e.linea, 'Así:  cout << "hola";   («>>» es para cin).');
       const v = yield* this.ev(e.b, amb);
+      if (v instanceof Manip) {
+        if (v.tipo === 'fixed') this.cout.fixed = true; else if (v.tipo === 'prec') this.cout.prec = v.n;
+        else if (v.tipo === 'ancho') this.cout.ancho = v.n; else this.cout.izq = v.tipo === 'izq';
+        return FLUJO_COUT;
+      }
       if (v === ENDL) this.escribe('\n');
       else if (v === FLUJO_CIN || v === FLUJO_COUT) throw new ErrorDojo('No se puede mandar cin o cout a cout.', e.linea);
       else if (Array.isArray(v)) throw new ErrorDojo('cout no puede mostrar un arreglo o un vector entero.', e.linea, 'Recórrelo con un for y muestra cada elemento.');
-      else this.escribe(textoDe(v, 'cpp'));
+      else {
+        let txt = v instanceof Real ? (this.cout.fixed ? v.v.toFixed(this.cout.prec) : fmtG(v.v, this.cout.prec)) : textoDe(v, 'cpp');
+        if (this.cout.ancho > txt.length) txt = this.cout.izq ? txt.padEnd(this.cout.ancho) : txt.padStart(this.cout.ancho);
+        this.cout.ancho = 0; this.escribe(txt);
+      }
       return FLUJO_COUT;
     }
     if (izq === FLUJO_CIN) {
@@ -1450,6 +1575,7 @@ class Maquina {
     const minimo = f.params.filter(p => !p.def).length;
     if (n > f.params.length || n < minimo) throw new ErrorDojo(`«${f.n}» espera ${f.params.length} dato(s) entre paréntesis y le diste ${n}.`, L, `Así la escribiste:  ${f.n}(${f.params.map(p => p.n).join(', ')})`);
     if (++this.prof > 150) { this.prof--; throw new ErrorDojo('Demasiadas llamadas una dentro de otra.', L, '¿La función se llama a sí misma sin un caso que la detenga?'); }
+    this.pila.push(f.n);
     try {
       const loc = new Ambito(lang === 'cpp' ? this.globales : null);
       for (let k = 0; k < f.params.length; k++) {
@@ -1485,7 +1611,7 @@ class Maquina {
         return this.coerce(f.tipo, res, L);
       }
       return res;
-    } finally { this.prof--; }
+    } finally { this.prof--; this.pila.pop(); }
   }
   *celdaRef(a, amb, p) {
     if (a.k === 'var') {
@@ -1536,7 +1662,9 @@ class Maquina {
       }
       case 'str': return args.length ? textoDe(args[0], 'py') : '';
       case 'bool': return args.length ? this.verdad(args[0]) : false;
-      case 'len': { const x = uno(); if (typeof x === 'string' || Array.isArray(x)) return x.length; throw new ErrorDojo(`len() no funciona con un ${nombreTipo(x, 'py')}.`, L, 'len() sirve para textos y listas.'); }
+      case 'len': { const x = uno(); if (typeof x === 'string' || Array.isArray(x)) return x.length; if (x instanceof Dic) return x.m.size; throw new ErrorDojo(`len() no funciona con un ${nombreTipo(x, 'py')}.`, L, 'len() sirve para textos, listas y diccionarios.'); }
+      case 'dict': { const d = new Dic(); if (args[0] instanceof Dic) for (const [k, par] of args[0].m) d.m.set(k, [par[0], par[1]]); for (const k in kw) d.m.set(claveDic(k, L), [k, kw[k]]); return d; }
+      case 'type': return `<class '${nombreClasePy(uno())}'>`;
       case 'range': {
         if (!args.length || args.length > 3) throw new ErrorDojo('range() lleva de 1 a 3 números.', L);
         if (args.some(a => !esNum(a) || esR(a))) throw new ErrorDojo('range() solo acepta números enteros.', L, args.some(a => typeof a === 'string') ? 'Si el número viene de input(), conviértelo con int(...).' : '');
@@ -1554,14 +1682,14 @@ class Maquina {
         return d === null ? r : R(r / f);
       }
       case 'max': case 'min': {
-        const l = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+        const l = args.length === 1 && (Array.isArray(args[0]) || args[0] instanceof Dic) ? this.iterable(args[0], L) : args;
         if (!l.length) throw new ErrorDojo(`${n}() de una lista vacía.`, L);
         let best = l[0]; for (const x of l.slice(1)) if (this.compara(n === 'max' ? '>' : '<', x, best, L)) best = x;
         return best;
       }
-      case 'sum': { const l = uno(); if (!Array.isArray(l)) throw new ErrorDojo('sum() suma los elementos de una lista.', L); let s = 0; for (const x of l) s = this.opBin('+', s, x, L); return s; }
-      case 'sorted': { const l = uno(); const c = typeof l === 'string' ? [...l] : l.slice(); this.ordena(c, L); if (kw.reverse && this.verdad(kw.reverse)) c.reverse(); return c; }
-      case 'list': { if (!args.length) return []; const x = uno(); if (typeof x === 'string') return [...x]; if (Array.isArray(x)) return x.slice(); throw new ErrorDojo(`list() no puede convertir un ${nombreTipo(x, 'py')}.`, L); }
+      case 'sum': { const l0 = uno(); if (!Array.isArray(l0) && !(l0 instanceof Dic)) throw new ErrorDojo('sum() suma los elementos de una lista.', L); const l = this.iterable(l0, L); let s = 0; for (const x of l) s = this.opBin('+', s, x, L); return s; }
+      case 'sorted': { const l = uno(); const c = this.iterable(l, L); this.ordena(c, L); if (kw.reverse && this.verdad(kw.reverse)) c.reverse(); return c; }
+      case 'list': { if (!args.length) return []; const x = uno(); if (typeof x === 'string' || Array.isArray(x) || x instanceof Dic) return this.iterable(x, L); throw new ErrorDojo(`list() no puede convertir un ${nombreTipo(x, 'py')}.`, L); }
       case 'reversed': { const x = uno(); return (typeof x === 'string' ? [...x] : x.slice()).reverse(); }
       case 'enumerate': { const x = uno(); return (typeof x === 'string' ? [...x] : x).map((v, k) => { const t = [k, v]; t.tupla = true; return t; }); }
       case 'ord': { const x = uno(); if (typeof x !== 'string' || x.length !== 1) throw new ErrorDojo('ord() recibe una sola letra.', L); return x.charCodeAt(0); }
@@ -1621,6 +1749,7 @@ class Maquina {
     const args = yield* this.evArgs(e.args, amb);
     const x = () => this.num1(args, n, L);
     switch (n) {
+      case 'setprecision': case 'setw': { const v = x(); if (!Number.isInteger(v) || v < 0) throw new ErrorDojo(`${n} recibe un número entero.`, L); return new Manip(n === 'setw' ? 'ancho' : 'prec', v); }
       case 'sqrt': { const v = x(); if (v < 0) throw new ErrorDojo('sqrt de un número negativo da «nan» (no es un número).', L); return R(Math.sqrt(v)); }
       case 'pow': if (args.length !== 2) throw new ErrorDojo('pow lleva dos números: pow(base, exponente).', L); return R(Math.pow(N(args[0]), N(args[1])));
       case 'abs': return esR(args[0]) ? R(Math.abs(x())) : Math.abs(x());
@@ -1665,6 +1794,17 @@ class Maquina {
   }
   metodoPy(o, m, args, kw, e) {
     const L = e.linea;
+    if (o instanceof Dic) switch (m) {
+      case 'keys': return [...o.m.values()].map(p => p[0]);
+      case 'values': return [...o.m.values()].map(p => p[1]);
+      case 'items': return [...o.m.values()].map(p => { const t = [p[0], p[1]]; t.tupla = true; return t; });
+      case 'get': { const k = claveDic(args[0], L); return o.m.has(k) ? o.m.get(k)[1] : (args.length > 1 ? args[1] : null); }
+      case 'pop': { const k = claveDic(args[0], L); if (o.m.has(k)) { const v = o.m.get(k)[1]; o.m.delete(k); return v; } if (args.length > 1) return args[1]; throw new ErrorDojo(`La clave ${reprPy(args[0])} no está en el diccionario (KeyError).`, L); }
+      case 'setdefault': { const k = claveDic(args[0], L); if (!o.m.has(k)) o.m.set(k, [args[0], args.length > 1 ? args[1] : null]); return o.m.get(k)[1]; }
+      case 'update': { if (!(args[0] instanceof Dic)) throw new ErrorDojo('.update() recibe otro diccionario.', L); for (const [k, par] of args[0].m) o.m.set(k, [par[0], par[1]]); return null; }
+      case 'clear': o.m.clear(); return null;
+      case 'copy': { const d = new Dic(); for (const [k, par] of o.m) d.m.set(k, [par[0], par[1]]); return d; }
+    }
     const t0 = () => { if (typeof args[0] !== 'string') throw new ErrorDojo(`.${m}() necesita un texto entre paréntesis.`, L); return args[0]; };
     if (typeof o === 'string') switch (m) {
       case 'upper': return o.toUpperCase(); case 'lower': return o.toLowerCase();
@@ -1697,6 +1837,7 @@ class Maquina {
       case 'copy': return o.slice();
       case 'extend': o.push(...args[0]); return null;
     }
+    if (o instanceof Dic) { const sug = parecido(m, ['keys', 'values', 'items', 'get', 'pop', 'setdefault', 'update', 'clear', 'copy']); throw new ErrorDojo(`Un diccionario no tiene el método «.${m}()».`, L, sug ? `¿Quisiste decir «.${sug}()»?` : 'Los más usados: .keys(), .values(), .items() y .get(clave).'); }
     const metodos = typeof o === 'string' ? ['upper', 'lower', 'strip', 'split', 'replace', 'count', 'find', 'join', 'startswith', 'endswith', 'title', 'capitalize', 'isdigit'] : Array.isArray(o) ? ['append', 'pop', 'insert', 'remove', 'index', 'count', 'sort', 'reverse', 'clear', 'copy', 'extend'] : [];
     const sug = parecido(m, metodos);
     throw new ErrorDojo(`Un ${nombreTipo(o, 'py')} no tiene el método «.${m}()».`, L, sug ? `¿Quisiste decir «.${sug}()»?` : '');
@@ -1734,42 +1875,49 @@ const MATH_PY = {
   sqrt: x => R(Math.sqrt(x)), floor: x => Math.floor(x), ceil: x => Math.ceil(x), pow: (x, y) => R(Math.pow(x, y)),
   fabs: x => R(Math.abs(x)), trunc: x => Math.trunc(x), sin: x => R(Math.sin(x)), cos: x => R(Math.cos(x)), log: x => R(Math.log(x))
 };
-const INTEGRADAS_PY = ['print', 'input', 'int', 'float', 'str', 'bool', 'len', 'range', 'abs', 'round', 'max', 'min', 'sum', 'sorted', 'list', 'reversed', 'enumerate', 'ord', 'chr'];
+const INTEGRADAS_PY = ['print', 'input', 'int', 'float', 'str', 'bool', 'len', 'range', 'abs', 'round', 'max', 'min', 'sum', 'sorted', 'list', 'dict', 'type', 'reversed', 'enumerate', 'ord', 'chr'];
 const INTEGRADAS_PS = ['RAIZ', 'ABS', 'TRUNC', 'REDON', 'AZAR', 'ALEATORIO', 'Longitud', 'Mayusculas', 'Minusculas', 'Subcadena', 'Concatenar', 'ConvertirANumero', 'ConvertirATexto'];
-const INTEGRADAS_CPP = ['sqrt', 'pow', 'abs', 'fabs', 'floor', 'ceil', 'round', 'max', 'min', 'to_string', 'stoi', 'stod', 'getline', 'swap', 'sort', 'reverse', 'toupper', 'tolower', 'isdigit', 'isalpha'];
+const INTEGRADAS_CPP = ['setprecision', 'setw', 'sqrt', 'pow', 'abs', 'fabs', 'floor', 'ceil', 'round', 'max', 'min', 'to_string', 'stoi', 'stod', 'getline', 'swap', 'sort', 'reverse', 'toupper', 'tolower', 'isdigit', 'isalpha'];
 
 /* ───────────── Lo que usa la app ───────────── */
 function leer(src, lang) { return lang === 'py' ? leerPy(src) : lang === 'ps' ? leerPs(src) : leerCpp(src); }
-function crear(src, lang) {
+function crear(src, lang, opciones) {
   let prog;
   try { prog = leer(src, lang); }
   catch (e) {
     if (!(e instanceof ErrorDojo)) e = new ErrorDojo('Fallo interno del Dojo al leer: ' + e.message, 0, 'Esto es un error de la app, no tuyo.');
-    return { maquina: null, eventos: [], avanzar: () => ({ estado: 'error', error: e }), salida: () => '' };
+    return { maquina: null, eventos: [], avisos: [], traza: () => [], avanzar: () => ({ estado: 'error', error: e }), salida: () => '' };
   }
-  const m = new Maquina(prog, lang); const gen = m.correr(); let fin = false;
+  const m = new Maquina(prog, lang, opciones); const gen = m.correr(); let fin = false;
   return {
-    maquina: m, eventos: m.eventos, salida: () => m.out.join(''),
+    maquina: m, eventos: m.eventos, avisos: prog.avisos || [], salida: () => m.out.join(''),
+    traza: () => {
+      if (!m.traza) return [];
+      const u = m.traza[m.traza.length - 1];
+      if (fin && (!u || (!u.fin && !u.error))) m.traza.push({ linea: 0, vars: u ? u.vars : [], salida: m.nSalida, pila: [], fin: true });
+      return m.traza;
+    },
     avanzar(entrada) {
       if (fin) return { estado: 'fin' };
-      try { const r = gen.next(entrada); if (r.done) { fin = true; return { estado: 'fin' }; } return { estado: 'pide' }; }
+      try { const r = gen.next(entrada); if (r.done) { fin = true; return { estado: 'fin' }; } return { estado: r.value && r.value.pausa ? 'pausa' : 'pide' }; }
       catch (e) {
         fin = true;
-        if (e instanceof ErrorDojo) return { estado: 'error', error: e };
+        if (e instanceof ErrorDojo) { if (m.traza) m.traza.push({ linea: e.linea, vars: [], salida: m.nSalida, pila: m.pila.slice(), error: e.message }); return { estado: 'error', error: e }; }
         if (e instanceof RangeError) return { estado: 'error', error: new ErrorDojo('El programa se metió en demasiadas llamadas.', m.linea, '¿Una función que se llama a sí misma sin parar?') };
         return { estado: 'error', error: new ErrorDojo('Fallo interno del Dojo: ' + e.message, m.linea, 'Esto es un error de la app, no tuyo.') };
       }
     }
   };
 }
-function correr(src, lang, entradas) {
-  const ej = crear(src, lang); const cola = (entradas || []).map(String); let r = ej.avanzar();
-  while (r.estado === 'pide') {
+function correr(src, lang, entradas, opciones) {
+  const ej = crear(src, lang, opciones); const cola = (entradas || []).map(String); let r = ej.avanzar();
+  while (r.estado === 'pide' || r.estado === 'pausa') {
+    if (r.estado === 'pausa') { r = ej.avanzar(); continue; }
     if (!cola.length) { r = { estado: 'error', error: new ErrorDojo('El programa pidió un dato y no había ninguno preparado.', ej.maquina ? ej.maquina.linea : 0, 'Escribe los datos en «Entrada», uno por línea.') }; break; }
     r = ej.avanzar(cola.shift());
   }
-  return { salida: ej.salida(), error: r.estado === 'error' ? r.error : null, eventos: ej.eventos };
+  return { salida: ej.salida(), error: r.estado === 'error' ? r.error : null, eventos: ej.eventos, avisos: ej.avisos, traza: opciones && opciones.traza ? ej.traza() : null };
 }
-const Motor = { correr, crear, leer, escanear, ErrorDojo, textoDe };
+const Motor = { correr, crear, leer, escanear, ErrorDojo, textoDe, LIMITE_PASOS };
 if (typeof module !== 'undefined' && module.exports) module.exports = Motor; else raiz.Motor = Motor;
 })(typeof window !== 'undefined' ? window : globalThis);

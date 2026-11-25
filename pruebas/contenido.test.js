@@ -10,20 +10,22 @@ for (const t of D.temas) for (const l of ['ps', 'py', 'cpp']) {
   if (r.error) fallo(`ejemplo ${t.id} [${l}]: línea ${r.error.linea} ${r.error.message}`); else bien++;
 }
 // 2. Los esqueletos de los ejercicios se pueden leer (no tienen errores de sintaxis)
-for (const t of D.temas) for (const l of ['ps', 'py', 'cpp']) {
-  try { Motor.leer(t.ejercicio.inicio[l], l); bien++; } catch (e) { fallo(`inicio ${t.id} [${l}]: ${e.message}`); }
+for (const t of D.temas) for (const ej of t.ejercicios) for (const l of ['ps', 'py', 'cpp']) {
+  try { Motor.leer(ej.inicio[l], l); bien++; } catch (e) { fallo(`inicio ${ej.id} [${l}]: ${e.message}`); }
 }
 // 3. Miles de retos
 const cuenta = {};
 for (const t of D.plantillas) for (const l of D.langsDe(t)) for (const tipo of D.TIPOS) for (let s = 1; s <= 12; s++) {
   try {
     const r = D.generar({ tpl: t.id, lang: l, tipo, seed: s * 1013 + 7 });
+    if (r.tipo !== tipo && tipo !== 'salida' && r.tipo !== 'salida') cuenta.cambiadas = (cuenta.cambiadas || 0) + 1;
     cuenta[r.tipo] = (cuenta[r.tipo] || 0) + 1;
     if (r.opciones) {
       if (r.correcta < 0) { fallo(`${t.id} ${l} ${tipo}: sin respuesta correcta`); continue; }
       if (new Set(r.opciones).size !== r.opciones.length) { fallo(`${t.id} ${l} ${r.tipo}: opciones repetidas ${JSON.stringify(r.opciones)}`); continue; }
       if (r.opciones.length < 3) { fallo(`${t.id} ${l} ${r.tipo}: solo ${r.opciones.length} opciones`); continue; }
     }
+    if (r.tipo === 'error' && r.codigoMal.split('\n').filter(x => x.trim()).length < 2) { fallo(`${t.id} ${l}: «encuentra el error» con una sola línea`); continue; }
     if (r.tipo === 'ordenar') { const ok = D.compruebaOrden(r, r.codigo.split('\n').filter(x => x.trim())); if (!ok.ok) { fallo(`${t.id} ${l} ordenar: el orden original no vale`); continue; } }
     if (r.tipo === 'traducir') { const o = Motor.correr(r.codigoOrigen, r.origen, r.entradas); if (o.error || D.limpia(o.salida) !== r.salida) { fallo(`${t.id} ${l} traducir: el original (${r.origen}) no da lo mismo: ${o.error ? o.error.message : JSON.stringify(D.limpia(o.salida)) + ' vs ' + JSON.stringify(r.salida)}`); continue; } }
     bien++;

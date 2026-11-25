@@ -1,0 +1,50 @@
+# Pruebas automáticas en cada subida: motor, contenido, ejercicios, núcleo y un recorrido completo
+# en un navegador real. También comprueba que docs/ (la app publicada) corresponde al código.
+name: Pruebas
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  unidades:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Motor (PSeInt, Python y C++)
+        run: node pruebas/motor.test.js
+      - name: Contenido (miles de retos generados)
+        run: node pruebas/contenido.test.js
+      - name: Ejercicios con soluciones de referencia
+        run: node pruebas/soluciones.test.js
+      - name: Núcleo (progreso, repaso espaciado, rango)
+        run: node pruebas/nucleo.test.js
+      - name: docs/ está al día con el código
+        run: python3 construir.py --sin-pruebas && git diff --exit-code -- docs
+  navegador:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unidades
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar Playwright y Chromium
+        run: npm install --no-save playwright@1.49.1 && npx playwright install --with-deps chromium
+      - name: Recorrido completo en el navegador
+        run: |
+          (cd docs && python3 -m http.server 8770 >/dev/null 2>&1 &)
+          sleep 1
+          node pruebas/e2e.js capturas
+      - name: Guardar las capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas
+          path: capturas
+          retention-days: 7
