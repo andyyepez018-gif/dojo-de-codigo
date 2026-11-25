@@ -1,4 +1,5 @@
 // Prueba de extremo a extremo en un navegador real (Chromium con Playwright).
+// Sin waitForFunction: la app prohíbe eval (política de seguridad) y eso rompería esas esperas.
 // Uso: sirve docs/ en http://localhost:8770 y ejecuta  node pruebas/e2e.js [carpeta-capturas]
 const { chromium, devices } = require('playwright');
 const fs = require('fs'), path = require('path');
@@ -70,7 +71,7 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   await p.fill('#editor-codigo', 'nombre = input("¿Nombre? ")\nd = {"a": 1}\nfor i in range(2):\n    print(i, nombre, d["a"])\n');
   await p.click('#btn-ejecutar'); await p.waitForSelector('.consola input');
   await p.fill('.consola input', 'Ana'); await p.press('.consola input', 'Enter');
-  await p.waitForFunction(() => /fin del programa/.test(document.querySelector('#consola').textContent));
+  await p.locator('#consola', { hasText: /fin del programa/ }).waitFor({ timeout: 15000 });
   ok('programa con dato y diccionario', /0 Ana 1\n1 Ana 1/.test(await p.textContent('#consola')), await p.textContent('#consola'));
   ok('el editor pinta colores', await p.locator('.editor .pintado .kw').count() > 0);
   await p.fill('#editor-codigo', 'i = 0\nwhile True:\n    i += 1\n');
@@ -78,11 +79,11 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   ok('mientras corre, el botón dice Detener', (await p.textContent('#btn-ejecutar')) === 'Detener');
   const clicable = await p.evaluate(() => { const t = performance.now(); return new Promise(r => setTimeout(() => r(performance.now() - t), 50)); });
   ok('la pantalla no se congela durante un bucle infinito', clicable < 400, clicable);
-  await p.click('#btn-ejecutar'); await p.waitForFunction(() => /detenido/.test(document.querySelector('#consola').textContent));
+  await p.click('#btn-ejecutar'); await p.locator('#consola', { hasText: /detenido/ }).waitFor({ timeout: 15000 });
   ok('Detener para el programa', true);
   await p.locator('#v-lab .chip', { hasText: 'C++' }).click();
   await p.fill('#editor-codigo', '#include <iostream>\n#include <iomanip>\nusing namespace std;\nint main() {\n    int a = 5;\n    if (a = 3) cout << fixed << setprecision(2) << 10.0 / 3 << endl;\n    return 0;\n}\n');
-  await p.click('#btn-ejecutar'); await p.waitForFunction(() => /fin del programa/.test(document.querySelector('#consola').textContent));
+  await p.click('#btn-ejecutar'); await p.locator('#consola', { hasText: /fin del programa/ }).waitFor({ timeout: 15000 });
   ok('C++ con setprecision', /3\.33/.test(await p.textContent('#consola')));
   ok('aviso de «=» en el if', /Aviso, línea 6/.test(await p.textContent('#avisos-lab')), await p.textContent('#avisos-lab'));
   await p.fill('#editor-codigo', '#include <iostream>\nusing namespace std;\nint main() {\n    int x = 5\n    cout << x;\n}\n');
@@ -168,7 +169,7 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   ok('el navegador la acepta como instalable', (await cdp.send('Page.getInstallabilityErrors')).installabilityErrors.length === 0);
   await c.setOffline(true); await p.reload(); await p.waitForSelector('.portada');
   await p.goto(URL + '#lab'); await p.locator('#v-lab .chip', { hasText: 'PSeInt' }).click();
-  await p.click('#btn-ejecutar'); await p.waitForFunction(() => /fin del programa/.test(document.querySelector('#consola').textContent));
+  await p.click('#btn-ejecutar'); await p.locator('#consola', { hasText: /fin del programa/ }).waitFor({ timeout: 15000 });
   ok('sin internet: carga y ejecuta código (hilo aparte incluido)', /Hola desde PSeInt/.test(await p.textContent('#consola')));
   ok('sin internet: usa las fuentes propias', await p.evaluate(() => document.fonts.check('16px "IBM Plex Sans"')));
   await c.setOffline(false);

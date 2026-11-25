@@ -48,6 +48,7 @@ node pruebas/soluciones.test.js   # los 20 ejercicios resueltos en los tres leng
 node pruebas/nucleo.test.js       # progreso, migración, repaso espaciado, rango
 # en un navegador (Playwright): sirve docs/ en el puerto 8770 y
 node pruebas/e2e.js [carpeta-capturas]
+node pruebas/claude.js            # la versión dentro de Claude, con Claude simulado
 ```
 
 GitHub Actions las pasa todas en cada subida (`.github/workflows/pruebas.yml`).

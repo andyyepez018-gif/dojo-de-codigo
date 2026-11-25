@@ -301,12 +301,32 @@ function elegirSpec() {
   const ok = D.langsDe(t).filter(l => langsOk.includes(l));
   return { tpl: t.id, lang: azar(ok.length ? ok : D.langsDe(t)), tipo: (P.d.temas[temaId] || { intentos: 0 }).intentos < 3 ? 'salida' : tipoAlAzar(), seed: semilla() };
 }
-function nuevoReto() {
+/* Genera un reto sin tocar el que está en pantalla */
+function generaReto() {
   for (let intento = 0; intento < 4; intento++) {
     const spec = elegirSpec();
     let r = null; try { r = D.generar(spec) || D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (e) { try { r = D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (x) { r = null; } }
-    if (r) { reto = r; reto.marca = spec.marca || ''; respondido = false; elegida = null; armado = []; resultadoOrden = null; return; }
+    if (r) { r.marca = spec.marca || ''; return r; }
   }
+  return null;
+}
+function nuevoReto() {
+  retoListo = null;
+  const r = generaReto(); if (!r) return;
+  reto = r; respondido = false; elegida = null; armado = []; resultadoOrden = null;
+}
+/* El siguiente reto se prepara en segundo plano mientras respondes el actual: «Siguiente» sale al instante */
+let retoListo = null;
+const claveAjustes = () => P.d.ajustes.lang + '|' + P.d.ajustes.tema;
+function preparaSiguiente() {
+  if (retoListo || retoDirigido) return;
+  const hazlo = () => { if (retoListo || retoDirigido) return; const r = generaReto(); if (r) retoListo = { reto: r, clave: claveAjustes() }; };
+  if (window.requestIdleCallback) requestIdleCallback(hazlo, { timeout: 1500 }); else setTimeout(hazlo, 200);
+}
+function siguienteReto() {
+  if (retoListo && retoListo.clave === claveAjustes() && !retoDirigido) { reto = retoListo.reto; respondido = false; elegida = null; armado = []; resultadoOrden = null; }
+  else nuevoReto();
+  retoListo = null; PINTA.retos();
 }
 function registra(ok) {
   const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.spec.tpl, lang: reto.lang, ok });
@@ -380,7 +400,7 @@ function respuestaReto() {
   if (et.retos && !et.ej) caja.append(h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Ya dominas los retos de «${D.temas.find(t => t.id === r.tema).titulo}». Para subir de cinturón falta uno de sus ejercicios de escribir código.`));
   const codigo = r.tipo === 'error' ? r.codigoMal : r.codigo;
   caja.append(h('div', { class: 'fila' },
-    h('button', { class: 'btn primario', id: 'siguiente', onclick: () => { nuevoReto(); PINTA.retos(); } }, 'Siguiente reto'),
+    h('button', { class: 'btn primario', id: 'siguiente', onclick: siguienteReto }, 'Siguiente reto'),
     r.tipo !== 'error' ? h('button', { class: 'btn', onclick: () => abrirLab({ lang: r.lang, codigo: D.completo(codigo, r.lang), entradas: r.entradas, traza: true }) }, 'Ver paso a paso') : null,
     h('button', { class: 'btn plano', onclick: () => abrirLab({ lang: r.lang, codigo: D.completo(codigo, r.lang), entradas: r.entradas }) }, 'Abrir en el laboratorio')));
   caja.append(botonTutor('Explícamelo mejor', () => `${REGLAS_TUTOR}\n\nExplica en 3 a 5 frases cortas ${r.tipo === 'error' ? 'dónde está el error de este programa y por qué es un error' : 'por qué este programa muestra exactamente lo que muestra'}. Ve paso a paso con los valores reales.\n\nLenguaje: ${NL[r.lang]}\nPrograma:\n${codigo}\n${r.entradas.length ? '\nEl usuario escribe: ' + r.entradas.join(', ') + '\n' : ''}\n${r.tipo === 'error' ? 'El error está en la línea ' + (r.lineaMal + 1) + ': ' + r.explicaError : 'Lo que muestra de verdad:\n' + (r.salida || '(nada)')}\n\nEl alumno ${ok ? 'acertó' : 'se equivocó'}.`));
@@ -406,12 +426,13 @@ PINTA.retos = function () {
     h('div', { class: 'entre' }, h('span', { class: 'tenue num', style: 'font-size:13.5px' }, `Hoy: ${d.retos} ${d.retos === 1 ? 'reto' : 'retos'}${d.retos ? ` · ${Math.round(d.aciertos / d.retos * 100)} % de aciertos` : ''}${pend ? ` · ${pend} repasos pendientes` : ''}`),
       h('span', { class: 'atajos' }, 'Teclado: 1 a 4 para responder · Enter para el siguiente'))));
   if (respondido) { const s = $('#siguiente'); if (s && document.activeElement && document.activeElement.closest && document.activeElement.closest('#v-retos')) s.focus({ preventScroll: true }); }
+  else preparaSiguiente();
 };
 document.addEventListener('keydown', e => {
   if (vista !== 'retos' || !reto || e.ctrlKey || e.metaKey || e.altKey || document.querySelector('.capa')) return;
   if (e.target.closest && e.target.closest('input, textarea, select')) return;
   if (!respondido && /^[1-9]$/.test(e.key) && reto.opciones && reto.tipo !== 'ordenar' && reto.tipo !== 'error') { const k = +e.key - 1; if (k < reto.opciones.length) { e.preventDefault(); responde(k); } }
-  else if (respondido && e.key === 'Enter' && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); nuevoReto(); PINTA.retos(); }
+  else if (respondido && e.key === 'Enter' && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); siguienteReto(); }
 });
 
 /* ───────────── RUTA ───────────── */

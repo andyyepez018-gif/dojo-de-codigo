@@ -41,6 +41,8 @@ jobs:
           (cd docs && python3 -m http.server 8770 >/dev/null 2>&1 &)
           sleep 1
           node pruebas/e2e.js capturas
+      - name: La versión dentro de Claude (con Claude simulado)
+        run: node pruebas/claude.js
       - name: Guardar las capturas
         if: always()
         uses: actions/upload-artifact@v4
