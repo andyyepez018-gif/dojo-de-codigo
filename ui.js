@@ -1,5 +1,5 @@
 /* Piezas de interfaz del Dojo: nodos, resaltado de código, bloques de código, editor con colores,
-   avisos, celebración y aspecto (claro/oscuro). */
+   avisos, cinturones, insignias de rango, celebración y aspecto (claro/oscuro). */
 (function (raiz) {
 'use strict';
 const $ = (s, el) => (el || document).querySelector(s);
@@ -147,15 +147,32 @@ const CINTURONES = [
   { n: '10.º kyū', c: '#F3F1EA' }, { n: '9.º kyū', c: '#E9C547' }, { n: '8.º kyū', c: '#E58A2E' }, { n: '7.º kyū', c: '#3F9A5A' }, { n: '6.º kyū', c: '#2F6DB5' },
   { n: '5.º kyū', c: '#7A4FB0' }, { n: '4.º kyū', c: '#A0703F' }, { n: '3.er kyū', c: '#7D5230' }, { n: '2.º kyū', c: '#5E3B22' }, { n: '1.er kyū', c: '#4A2E1A' }, { n: 'Shodan', c: '#16161B' }];
 const cinturon = (i, grande) => { const c = CINTURONES[Math.min(i, 10)]; return h('span', { class: 'cinturon' + (grande ? ' grande' : ''), style: `background:${c.c}`, role: 'img', 'aria-label': 'Cinturón ' + c.n, title: c.n }); };
-function celebra(i, texto) {
+/* ── Rangos: una insignia hexagonal por rango, del gris del Aprendiz al negro y oro del Ingeniero de élite ── */
+const COLORES_RANGO = ['#6B7587', '#3F7D69', '#2C7D49', '#23709F', '#2B4C9B', '#55409E', '#8E4426', '#7C5A12', '#9A6B08', '#16161B'];
+const ESTRELLA = (() => { const p = []; for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 4.6 : 10.5; p.push((20 + r * Math.cos(a)).toFixed(1) + ',' + (22.5 + r * Math.sin(a)).toFixed(1)); } return p.join(' '); })();
+function emblema(i, tam = 28, nombre = '') {
+  i = Math.max(0, Math.min(9, i | 0)); const oro = i >= 6;
+  const dentro = i === 9 ? `<polygon points="${ESTRELLA}" fill="#E9C547"/>` : `<text x="20" y="28.5" text-anchor="middle" font-size="${i === 8 ? 16 : 17}" font-weight="800" fill="#fff" font-family="IBM Plex Sans, system-ui, sans-serif">${i + 1}</text>`;
+  const svg = `<svg viewBox="0 0 40 44" width="${tam}" height="${Math.round(tam * 1.1)}" aria-hidden="true" focusable="false"><path d="M20 2.5 37 12.3v19.4L20 41.5 3 31.7V12.3z" fill="${COLORES_RANGO[i]}" stroke="${oro ? '#E9C547' : 'rgba(255,255,255,.4)'}" stroke-width="${oro ? 2.6 : 1.4}" stroke-linejoin="round"/>${dentro}</svg>`;
+  return h('span', { class: 'emblema', role: 'img', 'aria-label': nombre ? 'Rango ' + (i + 1) + ': ' + nombre : 'Rango ' + (i + 1), title: nombre || null, html: svg });
+}
+/* Celebración (cinturón, rango o unidad). Si ya hay una abierta, la siguiente espera su turno. */
+const colaFiestas = [];
+function celebra(i, texto, o = {}) {
+  if (document.querySelector('.capa')) { colaFiestas.push([i, texto, o]); return; }
   const antes = document.activeElement;
-  const cierra = () => { capa.remove(); document.removeEventListener('keydown', tecla); if (antes && antes.focus) antes.focus({ preventScroll: true }); };
+  const cierra = () => {
+    capa.remove(); document.removeEventListener('keydown', tecla);
+    if (colaFiestas.length) { celebra(...colaFiestas.shift()); return; }
+    if (antes && antes.focus) antes.focus({ preventScroll: true });
+  };
   const tecla = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); cierra(); } };
   const boton = h('button', { class: 'btn primario grande', onclick: cierra }, 'Seguir');
   const capa = h('div', { class: 'capa', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'celebra-titulo', onclick: e => { if (e.target === capa) cierra(); } },
-    h('div', { class: 'celebra' }, cinturon(i, true), h('span', { class: 'etiqueta' }, 'Nuevo cinturón'), h('h2', { id: 'celebra-titulo' }, CINTURONES[Math.min(i, 10)].n), h('p', null, texto), boton));
+    h('div', { class: 'celebra' }, o.figura || cinturon(i, true), h('span', { class: 'etiqueta' }, o.etiqueta || 'Nuevo cinturón'), h('h2', { id: 'celebra-titulo' }, o.titulo || CINTURONES[Math.min(i, 10)].n), h('p', null, texto), boton));
   document.body.append(capa); document.addEventListener('keydown', tecla); boton.focus();
 }
+const miles = n => Number(n).toLocaleString('es-ES');
 
 /* ── Aspecto: sistema / claro / oscuro (respeta lo que diga Claude si se elige «sistema») ── */
 const temaOriginal = document.documentElement.getAttribute('data-theme');
@@ -172,5 +189,5 @@ async function copia(texto) {
   return false;
 }
 
-raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, celebra, aplicaAspecto, vibra, copia, reduceMovimiento };
+raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, COLORES_RANGO, emblema, celebra, miles, aplicaAspecto, vibra, copia, reduceMovimiento };
 })(window);

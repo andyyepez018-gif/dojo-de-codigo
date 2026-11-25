@@ -42,6 +42,54 @@ const srv = http.createServer((q, r) => {
   ok('el plan enlaza a la app instalable', await p.locator('a[href="https://andyyepez018-gif.github.io/dojo-de-codigo/"]').count() === 1);
   ok('sin errores de JavaScript', errores.length === 0, errores);
   await c.close();
+
+  // Inglés dentro de Claude: su voz (tts), su dictado y la conversación libre con Claude (sample)
+  const { vozFalsa, resuelveIngles, cierraFiesta } = require('./robot-ingles.js');
+  for (const negar of [false, true]) {
+    const ci = await b.newContext({ viewport: { width: 1280, height: 860 } });
+    await ci.addInitScript(vozFalsa);
+    await ci.addInitScript(negar => {
+      localStorage.setItem('dojo-progreso', JSON.stringify({ v: 2, bienvenida: true, puntos: 50 }));
+      window.__tts = []; window.__dict = []; window.__navegador = 0; window.__charla = [];
+      const ss = window.speechSynthesis; const hablaNav = ss.speak.bind(ss); ss.speak = u => { window.__navegador++; hablaNav(u); };
+      const oyentes = { estadoT: [], parcial: [], final: [], estadoD: [] }, avisa = (l, e) => oyentes[l].slice().forEach(f => f(e));
+      const quita = (l, f) => () => { oyentes[l] = oyentes[l].filter(x => x !== f); };
+      const tts = { speak: (t, o) => { window.__tts.push({ t, o }); window.__dicho.push(t); avisa('estadoT', { state: 'speaking' }); return new Promise(r => setTimeout(() => { avisa('estadoT', { state: 'idle', reason: 'completed' }); r({ playedMs: 500 }); }, 20)); },
+        stop: async () => {}, onState: f => { oyentes.estadoT.push(f); return quita('estadoT', f); } };
+      let escuchando = false;
+      const dictation = { start: o => { window.__dict.push(o); if (negar) return Promise.reject({ code: 'not_granted', message: 'no' });
+          escuchando = true; avisa('estadoD', { state: 'listening' });
+          setTimeout(() => { avisa('parcial', { text: window.__oir.split(' ')[0] }); setTimeout(() => { avisa('final', { text: window.__oir }); avisa('parcial', { text: '' }); }, 30); }, 30);
+          return Promise.resolve(); },
+        stop: async () => { if (escuchando) { escuchando = false; avisa('estadoD', { state: 'idle', reason: 'stopped' }); } },
+        active: () => escuchando, onPartial: f => { oyentes.parcial.push(f); return quita('parcial', f); }, onFinal: f => { oyentes.final.push(f); return quita('final', f); }, onState: f => { oyentes.estadoD.push(f); return quita('estadoD', f); } };
+      const sample = async (input) => { window.__charla.push(input); return { text: Array.isArray(input) && input.length > 1 ? 'EN: Nice! What are you learning now?\nES: Se dice «I am», no «I is».' : 'EN: Hi! I am Sam. What is your name?\nES: Bien dicho.', truncated: false }; };
+      const doc = { onSnapshot(cb) { setTimeout(() => cb({ exists: false, data: () => undefined, metadata: { fromCache: false } }), 30); return () => {}; }, set: async () => {} };
+      window.claude = { use: async n => (n === 'tts' ? tts : n === 'dictation' ? dictation : n === 'sample' ? sample : n === 'db' ? { doc: () => doc } : n === 'user' ? { id: async () => 'u_prueba' } : null) };
+    }, negar);
+    const pi = await ci.newPage(); pi.on('pageerror', e => errores.push(e.message));
+    await pi.goto('http://localhost:8771/#ingles'); await pi.waitForSelector('.portada-en'); await pi.waitForTimeout(300);
+    if (!negar) {
+      ok('en Claude usa su voz y su dictado', /voz de Claude/.test(await pi.textContent('.estado-voz')) && /dictado de Claude/.test(await pi.textContent('.estado-voz')));
+      await pi.locator('#v-ingles').getByRole('button', { name: 'Practicar', exact: true }).click(); await pi.waitForSelector('#v-ingles .ejercicio');
+      let hablado = false;
+      for (let k = 0; k < 40 && !hablado; k++) { const t = await resuelveIngles(pi, true); hablado = t === 'habla'; if (!(await pi.locator('#v-ingles .respuesta.si').count())) ok('acierta con la voz de Claude (' + t + ')', false); await cierraFiesta(pi); if (!hablado) { await pi.locator('#ing-siguiente').click(); await pi.waitForSelector('#v-ingles .ejercicio'); } }
+      ok('habla con la voz de Claude, en inglés, y nunca con la del navegador', await pi.evaluate(() => window.__tts.length > 3 && window.__tts.every(x => x.o && x.o.language === 'en') && window.__navegador === 0));
+      ok('el dictado de Claude escucha en inglés y puntúa lo dicho', hablado && await pi.evaluate(() => window.__dict.length > 0 && window.__dict.every(o => o.language === 'en')) && await pi.locator('#v-ingles .palabras-dichas .mal').count() === 0);
+      await pi.locator('#v-ingles').getByRole('button', { name: '← Inglés' }).click();
+      await pi.locator('#v-ingles .portada-en').getByRole('button', { name: 'Conversar' }).click(); await pi.waitForSelector('#v-ingles .chat');
+      await pi.getByRole('button', { name: 'Hablar con Claude' }).click(); await pi.locator('#v-ingles .burbuja.ella').waitFor();
+      ok('la conversación libre: Claude saluda en inglés y se oye', /What is your name/.test(await pi.textContent('#v-ingles .chat')) && await pi.evaluate(() => window.__tts.at(-1).t === 'Hi! I am Sam. What is your name?'));
+      await pi.fill('#libre-texto', 'I is Leo'); await pi.keyboard.press('Enter'); await pi.locator('#v-ingles .correccion').waitFor();
+      ok('Claude corrige en español y la charla lleva todo lo dicho', /I am/.test(await pi.textContent('#v-ingles .correccion')) && await pi.evaluate(() => { const m = window.__charla.at(-1); return Array.isArray(m) && m.at(-1).role === 'user' && m.at(-1).content === 'I is Leo' && m.some(x => x.role === 'assistant'); }));
+    } else {
+      await pi.locator('#v-ingles .portada-en').getByRole('button', { name: 'Conversar' }).click(); await pi.waitForSelector('#v-ingles .chat');
+      await pi.locator('#v-ingles .microfono').click(); await pi.waitForTimeout(300);
+      ok('si niega el micrófono: lo dice, quita el botón y no lo pide por otro lado', /Sin permiso para el micrófono/.test(await pi.textContent('#aviso')) && await pi.locator('#v-ingles .microfono').count() === 0 && await pi.locator('#conv-texto').count() === 1);
+    }
+    await ci.close();
+  }
+  ok('sin errores de JavaScript en inglés', errores.length === 0, errores);
   await b.close(); srv.close();
   console.log(`${bien} bien, ${mal} mal`); process.exit(mal ? 1 : 0);
 })();

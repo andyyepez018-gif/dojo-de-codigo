@@ -1,8 +1,9 @@
-/* Dojo de código · las pantallas: Hoy, Retos, Ruta, Laboratorio y Plan.
-   La lógica sin pantalla está en nucleo.js; las piezas visuales en ui.js; la ejecución en ejecutor.js. */
+/* Dojo de código · las pantallas: Hoy, Retos, Inglés, Ruta, Laboratorio y Plan.
+   La lógica sin pantalla está en nucleo.js; las piezas visuales en ui.js; la ejecución en ejecutor.js;
+   el curso de inglés en ingles.js (contenido) y vista-ingles.js (pantalla); la voz en voz.js. */
 (function () {
 'use strict';
-const D = window.Dojo, M = window.Motor, N = window.Nucleo, U = window.UI, E = window.Ejecutor;
+const D = window.Dojo, M = window.Motor, N = window.Nucleo, U = window.UI, E = window.Ejecutor, I = window.Ingles, Voz = window.Voz;
 const { $, h, ls, mmss, NL, aviso, bloqueCodigo, salidaBloque, cinturon, CINTURONES } = U;
 const LANGS = N.LANGS, VERSION = N.VERSION;
 const URL_APP = 'https://andyyepez018-gif.github.io/dojo-de-codigo/';
@@ -11,7 +12,7 @@ document.documentElement.lang = 'es';
 
 /* ───────────── Progreso: en la cuenta (versión de Claude) o en este dispositivo ───────────── */
 const P = {
-  d: N.normaliza(ls.get('progreso', null), D), ref: null, escribiendo: false, otraVez: false, t: null, enCuenta: false,
+  d: N.normaliza(ls.get('progreso', null), D, I), ref: null, escribiendo: false, otraVez: false, t: null, enCuenta: false,
   async iniciar() {
     try {
       if (!enClaude) return;
@@ -24,7 +25,7 @@ const P = {
         const remoto = snap.exists ? snap.data() : null;
         if (primera && !snap.metadata.fromCache) { primera = false; this.enCuenta = true; pintaPie(); if (!remoto || (remoto.actualizado || 0) < this.d.actualizado) this.guardar(); }
         if (remoto && (remoto.actualizado || 0) > this.d.actualizado && !this.t && !this.escribiendo) {
-          this.d = N.normaliza(JSON.parse(JSON.stringify(remoto)), D); ls.set('progreso', this.d); repintar();
+          this.d = N.normaliza(JSON.parse(JSON.stringify(remoto)), D, I); ls.set('progreso', this.d); repintar();
         }
       }, () => { this.ref = null; pintaPie(); });
     } catch (e) { this.ref = null; }
@@ -69,30 +70,71 @@ function mostrarActualizacion(sw) {
   el.append(h('span', null, 'Hay una versión nueva del Dojo.'), h('button', { class: 'btn chico', onclick: () => { actualizando = true; sw.postMessage('actualizar'); } }, 'Actualizar ahora'));
 }
 
-/* ───────────── Rango y racha en la cabecera ───────────── */
+/* ───────────── Rango, puntos y racha en la cabecera ───────────── */
 function pintaRango() {
-  const i = dominados(), r = N.racha(P.d);
+  const rg = N.rangoDe(P.d.puntos), r = N.racha(P.d);
   for (const id of ['rango-lateral', 'rango-cabecera']) {
     const el = $('#' + id); if (!el) continue; el.textContent = '';
-    el.append(cinturon(i), h('span', null, CINTURONES[i].n), h('span', { class: 'insignia kihada num', title: 'Días seguidos practicando (5 retos o 10 min de foco)' }, `${r} ${r === 1 ? 'día' : 'días'}`));
+    el.append(U.emblema(rg.i, id === 'rango-lateral' ? 34 : 28, rg.rango.n),
+      h('span', { class: 'rango-texto' }, h('b', { class: 'rango-nombre' }, rg.rango.n), h('small', { class: 'num' }, `${U.miles(P.d.puntos)} puntos`)),
+      h('span', { class: 'insignia kihada num', title: 'Días seguidos practicando (5 retos, 5 ejercicios de inglés o 10 min de foco)' }, `${r} ${r === 1 ? 'día' : 'días'}`));
+    if (id === 'rango-lateral' && rg.siguiente) el.append(h('div', { class: 'barra kihada', role: 'progressbar', 'aria-label': 'Hacia el rango ' + rg.siguiente.n, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(rg.prop * 100)), title: `Faltan ${U.miles(rg.faltan)} puntos para «${rg.siguiente.n}»` }, h('i', { style: `width:${Math.round(rg.prop * 100)}%` })));
   }
+}
+/* Después de cualquier respuesta: guardar, repintar el rango y avisar si subes, recuperas o bajas de rango */
+function trataPuntos(res, ok) {
+  U.vibra(ok ? 18 : [40, 50, 40], P.d.ajustes.vibrar);
+  P.cambio(); pintaRango(); tic();
+  const c = res && res.cambio; if (!c) return;
+  const R = N.RANGOS[c.i], sig = N.RANGOS[c.i + 1];
+  if (c.tipo === 'sube') U.celebra(c.i, `${R.lema} ${sig ? `El siguiente, «${sig.n}», llega con ${U.miles(sig.min)} puntos.` : 'Llegaste al rango más alto del Dojo.'}`, { figura: U.emblema(c.i, 92, R.n), etiqueta: `Nuevo rango · ${c.i + 1} de ${N.RANGOS.length}`, titulo: R.n });
+  else if (c.tipo === 'recupera') aviso(`Recuperaste el rango «${R.n}».`, 4000);
+  else aviso(`Bajaste a «${R.n}». Con ${U.miles(sig.min - P.d.puntos)} puntos más recuperas «${sig.n}».`, 5500);
+}
+function chipPuntos(res) {
+  if (!res || typeof res.puntos !== 'number') return null;
+  const p = res.puntos, combo = res.combo >= 3 ? ` · ${res.combo} seguidos` : '';
+  return h('span', { class: 'insignia num ' + (p > 0 ? 'kihada' : p < 0 ? 'mal' : ''), title: 'Puntos de esta respuesta' }, `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)} puntos${combo}`);
+}
+/* Qué vale cada cosa (sale de N.PUNTOS, así nunca se desajusta del cálculo real) */
+function tablaPuntos() {
+  const X = N.PUNTOS, fila = (t, v, cls) => h('li', null, h('span', null, t), h('b', { class: 'num ' + (cls || '') }, v));
+  return h('div', { class: 'tabla-puntos' },
+    h('div', null, h('span', { class: 'etiqueta' }, 'Ganas'), h('ul', null,
+      fila('Reto de código acertado', `+${X.reto} (hasta +${X.reto + X.comboMax} en racha)`, 'mas'),
+      fila('Ejercicio de inglés acertado', `+${X.ingles} (hasta +${X.ingles + X.comboMax})`, 'mas'),
+      fila('Frase dicha bien en voz alta', `+${X.habla} (casi bien: +${X.hablaCasi})`, 'mas'),
+      fila('Ejercicio del laboratorio, por lenguaje', `+${X.ejercicio}`, 'mas'), fila('Lección de HTML', `+${X.html}`, 'mas'), fila('Cada minuto de foco', `+${X.focoMin}`, 'mas'),
+      fila('Meta diaria de retos · de inglés', `+${X.meta} · +${X.metaIngles}`, 'mas'),
+      fila('Conversación en inglés', `+${X.conversa} la primera, +${X.conversaOtra} después`, 'mas'),
+      fila('Cinturón nuevo · unidad de inglés dominada', `+${X.cinturon} · +${X.unidad}`, 'mas'))),
+    h('div', null, h('span', { class: 'etiqueta' }, 'Pierdes'), h('ul', null,
+      fila('Reto de código fallado', `−${-X.retoFallo}`, 'menos'), fila('Ejercicio de inglés fallado', `−${-X.inglesFallo}`, 'menos'), fila('Frase mal pronunciada', `−${-X.hablaFallo}`, 'menos')),
+      h('p', { class: 'tenue', style: 'font-size:13px' }, `La racha: cada acierto seguido suma +1 más, hasta +${X.comboMax}; un fallo la corta. Los puntos nunca bajan de 0. Si bajan del mínimo de tu rango, bajas de rango, y lo recuperas al volver a subir. No restan ni el laboratorio (probar y equivocarse es programar) ni las conversaciones (son para soltarte a hablar).`)));
+}
+function escaleraRangos() {
+  const rg = N.rangoDe(P.d.puntos);
+  return h('ol', { class: 'escalera' }, ...N.RANGOS.map((R, k) => h('li', { class: k === rg.i ? 'actual' : k <= P.d.rangoMax ? 'logrado' : 'futuro', 'aria-current': k === rg.i ? 'step' : null },
+    U.emblema(k, 30, R.n), h('span', { class: 'detalle' }, h('b', null, R.n), h('small', { class: 'tenue' }, R.lema)),
+    h('span', { class: 'num tenue' }, k === rg.i ? 'Tú' : U.miles(R.min)))));
 }
 
 /* ───────────── Navegación ───────────── */
 const ICONOS = {
   hoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   retos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  ingles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.5-5.2A8.5 8.5 0 1 1 21 12z"/><path d="M8 15.5 10.3 8.5h.4l2.3 7M8.8 13.3h3.4M14.8 10h3"/></svg>',
   ruta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></svg>',
   lab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>'
 };
-const VISTAS = [['hoy', 'Hoy'], ['retos', 'Retos'], ['ruta', 'Ruta'], ['lab', 'Laboratorio'], ['plan', 'Plan']];
+const VISTAS = [['hoy', 'Hoy'], ['retos', 'Retos'], ['ingles', 'Inglés'], ['ruta', 'Ruta'], ['lab', 'Laboratorio'], ['plan', 'Plan']];
 let vista = 'hoy';
 function pintaMenus() {
   for (const id of ['menu-lateral', 'menu-pestanas']) {
     const el = $('#' + id); el.textContent = '';
     for (const [v, n] of VISTAS) el.append(h('a', { href: '#' + v, 'aria-current': v === vista ? 'page' : null, html: ICONOS[v] + `<span>${n === 'Laboratorio' && id === 'menu-pestanas' ? 'Lab' : n}</span>`,
-      onclick: e => { if (v === 'lab') lab.modo = 'editar'; if (v === 'ruta') temaAbierto = null; if (location.hash === '#' + v) { e.preventDefault(); mostrar(v, true); } } }));
+      onclick: e => { if (v === 'lab') lab.modo = 'editar'; if (v === 'ruta') temaAbierto = null; if (v === 'ingles') VI.inicio(); if (location.hash === '#' + v) { e.preventDefault(); mostrar(v, true); } } }));
   }
 }
 function ir(v) { if (location.hash !== '#' + v) location.hash = v; else mostrar(v); }
@@ -100,6 +142,7 @@ function mostrar(v, forzar) {
   if (!VISTAS.some(x => x[0] === v)) v = 'hoy';
   const cambia = v !== vista || forzar;
   if (vista === 'lab' && v !== 'lab') detenerEjecucion();   // no dejar programas vivos al salir del laboratorio
+  if (vista === 'ingles' && v !== 'ingles') { Voz.callar(); Voz.parar(); }
   vista = v; pintaMenus();
   document.querySelectorAll('[data-vista]').forEach(s => { s.hidden = s.dataset.vista !== v; });
   PINTA[v]();
@@ -112,13 +155,15 @@ function repintar() { U.aplicaAspecto(P.d.ajustes.aspecto); pintaRango(); pintaB
 let espera = ls.get('espera', null);   // { inicio, retos }
 let foco = ls.get('foco', null);       // { inicio, minutos }
 if (espera && Date.now() - espera.inicio > 90 * 60e3) { espera = null; ls.set('espera', null); }
-function empiezaEspera() {
+const hechosHoy = () => { const x = N.leeDia(P.d); return x.retos + x.ingles; };
+function empiezaEspera(adonde = 'retos') {
   if (foco) { aviso('Estás en un bloque de foco: ahora toca no mirar a Claude.'); ir('retos'); return; }
-  espera = { inicio: Date.now(), retos: N.leeDia(P.d).retos }; ls.set('espera', espera); pintaBandas(); ir('retos');
+  espera = { inicio: Date.now(), retos: hechosHoy() }; ls.set('espera', espera); pintaBandas();
+  if (adonde === 'ingles') VI.practicar(); else ir('retos');
 }
 function terminaEspera(convertida) {
   if (!espera) return;
-  const seg = Math.round((Date.now() - espera.inicio) / 1000), hechos = N.leeDia(P.d).retos - espera.retos;
+  const seg = Math.round((Date.now() - espera.inicio) / 1000), hechos = hechosHoy() - espera.retos;
   const d = N.dia(P.d); if (convertida) { d.esperas++; d.segEspera += seg; } else d.perdidas++;
   P.cambio(); espera = null; ls.set('espera', null); pintaBandas();
   if (convertida) aviso(hechos > 0 ? `Espera aprovechada: ${mmss(seg)} y ${hechos} ${hechos === 1 ? 'reto' : 'retos'}. Vuelve con Claude.` : 'Anotado. La próxima espera, haz al menos un reto.');
@@ -134,7 +179,7 @@ function empiezaFoco() {
 function terminaFoco(completo) {
   if (!foco) return;
   const min = completo ? foco.minutos : Math.min(foco.minutos, Math.floor((Date.now() - foco.inicio) / 60e3));
-  N.dia(P.d).foco += min; P.d.puntos += min * 2; P.cambio(); foco = null; ls.set('foco', null); pintaBandas(); pintaRango();
+  N.dia(P.d).foco += min; const pf = N.sumaPuntos(P.d, min * N.PUNTOS.focoMin); foco = null; ls.set('foco', null); trataPuntos(pf, true); pintaBandas();
   aviso(min > 0 ? `Bloque de foco: ${min} min sumados. Ya puedes mirar qué hizo Claude.` : 'Bloque cancelado.');
   if (vista === 'hoy') PINTA.hoy();
 }
@@ -148,7 +193,7 @@ function pintaBandas() {
   } else if (espera) {
     el.append(h('div', { class: 'banda espera', role: 'status' },
       h('span', { class: 'pulso', 'aria-hidden': 'true' }), h('span', { class: 'reloj', id: 'reloj-espera' }, '00:00'),
-      h('span', { class: 'texto', id: 'texto-espera' }, 'Claude trabaja. Tú, retos.'),
+      h('span', { class: 'texto', id: 'texto-espera' }, 'Claude trabaja. Tú, a practicar.'),
       h('button', { class: 'btn chico lleno', onclick: () => terminaEspera(true) }, 'Claude ya respondió'),
       h('button', { class: 'btn chico', onclick: () => terminaEspera(false) }, 'Me distraje')));
   }
@@ -157,8 +202,8 @@ function pintaBandas() {
 function tic() {
   if (espera) {
     const r = $('#reloj-espera'); if (r) r.textContent = mmss((Date.now() - espera.inicio) / 1000);
-    const t = $('#texto-espera'); const n = N.leeDia(P.d).retos - espera.retos;
-    if (t) t.textContent = n > 0 ? `Claude trabaja · llevas ${n} ${n === 1 ? 'reto' : 'retos'} en esta espera` : 'Claude trabaja. Tú, retos.';
+    const t = $('#texto-espera'); const n = hechosHoy() - espera.retos;
+    if (t) t.textContent = n > 0 ? `Claude trabaja · llevas ${n} ${n === 1 ? 'ejercicio' : 'ejercicios'} en esta espera` : 'Claude trabaja. Tú, a practicar.';
   }
   if (foco) {
     const quedan = foco.minutos * 60 - (Date.now() - foco.inicio) / 1000; const r = $('#reloj-foco');
@@ -171,6 +216,7 @@ setInterval(tic, 1000);
 /* ───────────── El tutor: Claude dentro de la página, o la pregunta lista para copiar ───────────── */
 let sample = null, tutorApagado = false;
 if (enClaude) window.claude.use('sample').then(s => { sample = s; if (vista !== 'hoy') PINTA[vista](); }).catch(() => {});
+const sampleActivo = () => (tutorApagado ? null : sample);
 const REGLAS_TUTOR = 'Eres un profesor de programación paciente. Hablas en español sencillo, de tú, a alguien que está empezando. Frases cortas, sin saludos ni felicitaciones, sin formato Markdown (nada de asteriscos ni almohadillas). Solo cosas básicas de un primer curso.';
 function botonTutor(texto, hacerPrompt) {
   const caja = h('div', { class: 'tutor', hidden: true, 'aria-live': 'polite' });
@@ -201,6 +247,7 @@ function accionPaso(p) {
   if (p.accion === 'retos') { nuevoReto(); ir('retos'); }
   else if (p.accion === 'repaso') { P.d.ajustes.tema = 'repaso'; P.cambio(); nuevoReto(); ir('retos'); }
   else if (p.accion === 'ejercicio') { const t = temaActual(); const ej = t.ejercicios.find(e => !N.ejercicioHecho(P.d, e.id)) || t.ejercicios[0]; abrirLab({ ejercicio: ej.id }); }
+  else if (p.accion === 'ingles') VI.practicar();
   else if (p.accion === 'foco') empiezaFoco();
   else if (p.accion === 'tema') abrirTema(temaActual().id);
   else abrirLab({});
@@ -214,7 +261,8 @@ function tarjetaBienvenida() {
     h('ol', { class: 'pasos' },
       h('li', null, h('b', null, 'En cada espera de Claude, '), 'pulsa «Sí · empezar retos» y responde retos de 30 segundos hasta que te conteste.'),
       h('li', null, h('b', null, 'Una vez al día, '), 'haz un bloque de foco: lee la lección y escribe el ejercicio en el laboratorio.'),
-      h('li', null, h('b', null, 'Cada tema que dominas '), 'te da un cinturón nuevo, del 10.º kyū hasta Shodan.')),
+      h('li', null, h('b', null, 'Cada acierto suma puntos y cada fallo resta. '), 'Con los puntos subes de rango: diez rangos, de Aprendiz a Ingeniero de élite. Y cada tema que dominas te da un cinturón.'),
+      h('li', null, h('b', null, 'Y también inglés: '), 'el que usan los programadores, desde cero, para entenderlo y hablarlo.')),
     h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Qué quieres practicar'), chips('lang', [['mezcla', 'Los tres'], ['ps', 'PSeInt'], ['py', 'Python'], ['cpp', 'C++']])),
     h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Retos al día'), chips('meta', [[10, '10'], [20, '20'], [30, '30']])),
     h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => { P.d.bienvenida = true; P.cambio(); PINTA.hoy(); aviso('Listo. Ahora, cada vez que le escribas a Claude, vuelve aquí.'); } }, 'Empezar')));
@@ -222,7 +270,7 @@ function tarjetaBienvenida() {
 PINTA.hoy = function () {
   const el = $('#v-hoy'); el.textContent = '';
   if (!P.d.bienvenida) { el.append(h('div', { class: 'columna' }, tarjetaBienvenida())); return; }
-  const d = N.leeDia(P.d), meta = P.d.ajustes.meta, t = temaActual(), et = est(t.id), i = dominados();
+  const d = N.leeDia(P.d), meta = P.d.ajustes.meta, metaI = P.d.ajustes.metaIngles, t = temaActual(), et = est(t.id), i = dominados();
   const portada = h('div', { class: 'portada' },
     h('span', { class: 'kanji', 'aria-hidden': 'true' }, '道'),
     h('span', { class: 'etiqueta', style: 'color:inherit;opacity:.85' }, espera ? 'Claude está trabajando' : foco ? 'Bloque de foco en marcha' : 'Tu regla'),
@@ -230,8 +278,8 @@ PINTA.hoy = function () {
     h('p', null, espera ? 'Cuando Claude termine, toca «Claude ya respondió» arriba y vuelve con él.' : foco ? 'Abre la lección del tema actual y resuelve su ejercicio en el laboratorio.' : 'Mientras trabaja, haz retos de 30 segundos aquí en vez de abrir TikTok. Cuando responda, vuelves con él.'),
     espera ? h('button', { class: 'btn primario grande', onclick: () => ir('retos') }, 'Seguir con los retos')
       : foco ? h('button', { class: 'btn primario grande', onclick: () => abrirTema(t.id) }, 'Abrir la lección')
-      : h('button', { class: 'btn primario grande', onclick: empiezaEspera }, 'Sí · empezar retos'));
-  const paso = N.siguientePaso(P.d, D, { foco: !!foco, espera: !!espera });
+      : h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => empiezaEspera('retos') }, 'Sí · empezar retos'), h('button', { class: 'btn secundario', onclick: () => empiezaEspera('ingles') }, 'O practicar inglés')));
+  const paso = N.siguientePaso(P.d, D, { foco: !!foco, espera: !!espera }, I);
   const siguiente = espera ? null : h('section', { class: 'tarjeta siguiente', 'aria-labelledby': 'sig-t' },
     h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, 'Siguiente paso'), h('span', { class: 'insignia ai' }, `Tema ${D.temas.indexOf(t) + 1}: ${t.titulo}`)),
     h('h2', { id: 'sig-t' }, paso.titulo), h('p', { class: 'tenue' }, paso.texto),
@@ -240,10 +288,20 @@ PINTA.hoy = function () {
   const metrica = (etq, valor, de, barra, pct, nota) => h('div', { class: 'metrica' }, h('span', { class: 'etiqueta' }, etq), h('b', { class: 'num' }, String(valor), h('small', null, de)), h('div', { class: 'barra ' + barra, role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(pct)), 'aria-label': etq }, h('i', { style: `width:${Math.min(100, pct)}%` })), h('small', null, nota));
   const metricas = h('div', { class: 'metricas' },
     metrica('Retos hoy', d.retos, ` / ${meta}`, '', d.retos / meta * 100, d.retos ? `${Math.round(d.aciertos / d.retos * 100)} % de aciertos` : 'Empieza por uno'),
+    metrica('Inglés hoy', d.ingles, ` / ${metaI}`, '', d.ingles / metaI * 100, d.ingles ? `${Math.round(d.inglesOk / d.ingles * 100)} % bien` : 'Escuchar y hablar'),
     metrica('Foco hoy', d.foco, ` / ${P.d.ajustes.foco} min`, 'kihada', d.foco / P.d.ajustes.foco * 100, 'Escribir código sin Claude'),
     metrica('Esperas', d.esperas, d.perdidas ? ` · ${d.perdidas} a TikTok` : ' aprovechadas', 'bien', d.esperas + d.perdidas ? d.esperas / (d.esperas + d.perdidas) * 100 : 0, mins ? `${mins} min convertidos en práctica` : 'Cada espera cuenta'));
+  const rg = N.rangoDe(P.d.puntos);
+  const rangoT = h('section', { class: 'tarjeta rango-tarjeta', 'aria-labelledby': 'rango-t' },
+    h('div', { class: 'cabeza-rango' }, U.emblema(rg.i, 58, rg.rango.n),
+      h('div', { class: 'pila', style: 'gap:2px' }, h('span', { class: 'etiqueta' }, `Tu rango · ${rg.n} de ${N.RANGOS.length}`), h('h2', { id: 'rango-t' }, rg.rango.n), h('span', { class: 'tenue' }, rg.rango.lema))),
+    h('div', { class: 'entre' }, h('b', { class: 'num puntos-grandes' }, `${U.miles(P.d.puntos)} puntos`), h('span', { class: 'insignia num ' + (d.puntos > 0 ? 'kihada' : d.puntos < 0 ? 'mal' : '') }, `Hoy ${d.puntos > 0 ? '+' : d.puntos < 0 ? '−' : ''}${U.miles(Math.abs(d.puntos))}`)),
+    rg.siguiente ? h('div', { class: 'pila', style: 'gap:6px' }, h('div', { class: 'barra kihada', role: 'progressbar', 'aria-label': 'Hacia el rango ' + rg.siguiente.n, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(rg.prop * 100)) }, h('i', { style: `width:${Math.round(rg.prop * 100)}%` })),
+      h('small', { class: 'tenue' }, `Faltan ${U.miles(rg.faltan)} puntos para «${rg.siguiente.n}». Acertar suma; fallar resta.`))
+      : h('p', null, 'Estás en la cima. Sigue practicando: si los puntos bajan de 30.000, bajas de rango.'),
+    h('details', { class: 'desplegable' }, h('summary', null, 'Los 10 rangos y cómo se ganan los puntos'), escaleraRangos(), tablaPuntos()));
   const rango = h('section', { class: 'tarjeta' },
-    h('div', { class: 'entre' }, h('div', { class: 'fila' }, cinturon(i), h('h2', null, CINTURONES[i].n)), h('span', { class: 'insignia num' }, `${P.d.puntos} puntos`)),
+    h('div', { class: 'entre' }, h('div', { class: 'fila' }, cinturon(i), h('h2', null, 'Cinturón: ' + CINTURONES[i].n)), h('span', { class: 'insignia num' }, `${i} de ${D.temas.length} temas`)),
     i >= 10 ? h('p', null, 'Dominaste los 10 temas. Ya sabes lo básico de los tres lenguajes: toca hacer un proyecto pequeño tuyo.')
       : h('p', { class: 'tenue' }, `Para el siguiente cinturón domina «${t.titulo}»: acierta 8 de los últimos 10 retos del tema y resuelve uno de sus ejercicios en el laboratorio.`),
     i < 10 ? h('div', { class: 'fila', style: 'gap:14px' },
@@ -267,14 +325,21 @@ PINTA.hoy = function () {
   const barras = h('div', { class: 'semana', role: 'img', 'aria-label': 'Retos de los últimos 7 días: ' + sem.map(v => v.retos).join(', ') },
     ...sem.map((v, j) => h('div', { class: 'dia' + (j === 6 ? ' hoy' : ''), title: `${v.retos} retos` }, h('span', { class: v.retos >= meta ? 'lleno' : '', style: `height:${Math.max(3, v.retos / tope * 100)}%` }), letras[new Date(v.k + 'T12:00').getDay()])));
   const tot = N.totales(P.d), r = N.racha(P.d);
-  const semana = h('section', { class: 'tarjeta' }, h('div', { class: 'entre' }, h('h2', null, 'Tu semana'), h('span', { class: 'tenue', style: 'font-size:13px' }, `Racha: ${r} ${r === 1 ? 'día' : 'días'} (5 retos o 10 min de foco)`)),
+  const semana = h('section', { class: 'tarjeta' }, h('div', { class: 'entre' }, h('h2', null, 'Tu semana'), h('span', { class: 'tenue', style: 'font-size:13px' }, `Racha: ${r} ${r === 1 ? 'día' : 'días'} (5 retos, 5 de inglés o 10 min de foco)`)),
     tot.retos ? barras : h('p', { class: 'tenue' }, 'Aún no hay retos. Las barras de cada día aparecerán aquí.'),
-    tot.retos ? h('p', { class: 'tenue num', style: 'font-size:13px' }, `En total: ${tot.retos} retos (${Math.round(tot.aciertos / tot.retos * 100)} % bien), ${tot.foco} min de foco y ${Math.round(tot.segEspera / 60)} min de esperas convertidas en práctica, en ${tot.dias} ${tot.dias === 1 ? 'día' : 'días'}.`) : null);
-  el.append(h('div', { class: 'columna' }, portada, siguiente, metricas, rango, h('div', { class: 'dos-col' }, lenguajes, debiles), focoT, semana));
+    tot.retos || tot.ingles ? h('p', { class: 'tenue num', style: 'font-size:13px' }, `En total: ${tot.retos} retos${tot.retos ? ` (${Math.round(tot.aciertos / tot.retos * 100)} % bien)` : ''}, ${tot.ingles} ejercicios de inglés, ${tot.foco} min de foco y ${Math.round(tot.segEspera / 60)} min de esperas convertidas en práctica, en ${tot.dias} ${tot.dias === 1 ? 'día' : 'días'}.`) : null);
+  const u = N.unidadActual(P.d, I), eu = N.estadoUnidad(P.d, I, u.id), pendI = N.pendientesIngles(P.d, I).length;
+  const inglesT = h('section', { class: 'tarjeta' },
+    h('div', { class: 'entre' }, h('h2', null, 'Inglés para programar'), h('span', { class: 'insignia ai' }, VI.NIVEL[u.nivel])),
+    h('p', { class: 'tenue' }, `Unidad ${u.n} de ${I.unidades.length}: «${u.titulo}». ${u.tema}.`),
+    h('div', { class: 'pila', style: 'gap:6px' }, h('small', { class: 'tenue' }, eu.n ? `${Math.round(eu.prop * 100)} % de los últimos ${eu.n} ejercicios · ${eu.conversa ? 'conversación hecha' : 'falta la conversación'}` : 'Empieza por las palabras de la unidad'), h('div', { class: 'barra' }, h('i', { style: `width:${Math.round(eu.prop * 100)}%` }))),
+    h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => VI.practicar() }, 'Practicar'), h('button', { class: 'btn', onclick: () => VI.conversar(u.id) }, 'Conversar'),
+      pendI ? h('button', { class: 'btn plano', onclick: () => VI.repasar() }, `Repasar (${pendI})`) : null));
+  el.append(h('div', { class: 'columna' }, portada, siguiente, metricas, rangoT, h('div', { class: 'dos-col' }, rango, inglesT), h('div', { class: 'dos-col' }, lenguajes, debiles), focoT, semana));
 };
 
 /* ───────────── RETOS ───────────── */
-let reto = null, respondido = false, elegida = null, armado = [], resultadoOrden = null, ultimaPlantilla = null;
+let retoPintado = null, reto = null, respondido = false, elegida = null, armado = [], resultadoOrden = null, ultimaPlantilla = null, ultimoRes = null;
 const colaSesion = [];
 const azar = arr => arr[Math.floor(Math.random() * arr.length)];
 const semilla = () => Math.floor(Math.random() * 2147483647);
@@ -333,10 +398,9 @@ function siguienteReto() {
 function registra(ok) {
   const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.spec.tpl, lang: reto.lang, ok });
   if (!ok) colaSesion.push({ tpl: reto.spec.tpl, lang: reto.lang, tipo: reto.tipo, seed: (reto.spec.seed + 104729) % 2147483647, tras: 0 });
-  U.vibra(ok ? 18 : [40, 50, 40], P.d.ajustes.vibrar);
-  P.cambio(); pintaRango(); tic();
+  ultimoRes = res; trataPuntos(res, ok);
   if (res.cinturon) U.celebra(res.cinturon, `Dominaste «${D.temas.find(t => t.id === reto.tema).titulo}». Siguiente tema: «${temaActual().titulo}».`);
-  else if (res.metaCumplida) aviso(`Meta de hoy cumplida: ${P.d.ajustes.meta} retos.`);
+  else if (res.metaCumplida) aviso(`Meta de hoy cumplida: ${P.d.ajustes.meta} retos. +${N.PUNTOS.meta} puntos.`);
 }
 function responde(k) { if (respondido || !reto) return; respondido = true; elegida = k; registra(k === reto.correcta); PINTA.retos(); }
 const letraOpcion = k => h('span', { class: 'letra', 'aria-hidden': 'true' }, String(k + 1));
@@ -385,7 +449,7 @@ function cuerpoReto() {
 }
 function respuestaReto() {
   const r = reto, ok = elegida === r.correcta;
-  const caja = h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' }, h('h3', null, ok ? 'Correcto' : r.tipo === 'ordenar' ? 'Ese orden no da lo mismo' : 'No era esa'));
+  const caja = h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' }, h('div', { class: 'entre' }, h('h3', null, ok ? 'Correcto' : r.tipo === 'ordenar' ? 'Ese orden no da lo mismo' : 'No era esa'), chipPuntos(ultimoRes)));
   if (r.tipo === 'error') caja.append(h('p', null, `El error está en la línea ${r.lineaMal + 1}. ${r.explicaError}`), h('p', { class: 'tenue' }, `El Dojo lo avisaría así: «${r.mensajeMotor}»`));
   else if (r.tipo === 'ordenar') {
     if (!ok) caja.append(h('p', null, resultadoOrden.error ? `Con tu orden el programa da un error en la línea ${resultadoOrden.error.linea}: ${resultadoOrden.error.message}` : 'Con tu orden el programa muestra:'), resultadoOrden.error ? '' : salidaBloque(resultadoOrden.salida), h('span', { class: 'etiqueta' }, 'Un orden que funciona'), bloqueCodigo(r.codigo, r.lang));
@@ -418,10 +482,11 @@ PINTA.retos = function () {
     ...D.temas.map((t, k) => h('option', { value: t.id }, `${k + 1}. ${t.titulo}`)));
   sel.value = aj.tema || 'auto';
   const r = reto, d = N.leeDia(P.d);
-  const tarjeta = h('article', { class: 'tarjeta reto entra', 'aria-live': 'polite' },
+  const tarjeta = h('article', { class: 'tarjeta reto' + (retoPintado !== r ? ' entra' : ''), 'aria-live': 'polite' },
     h('div', { class: 'reto-cab' }, h('span', { class: 'etiqueta' }, D.NOMBRE_TIPO[r.tipo]),
       h('span', { class: 'fila', style: 'gap:6px' }, r.marca ? h('span', { class: 'insignia kihada' }, r.marca) : null, h('span', { class: 'insignia' }, D.temas.find(t => t.id === r.tema).titulo), h('span', { class: 'insignia ai' }, NL[r.lang]))),
     ...cuerpoReto(), respondido ? respuestaReto() : null);
+  retoPintado = r;   // la animación de entrada solo con un reto nuevo
   el.append(h('div', { class: 'columna' }, h('h1', { class: 'sr-only' }, 'Retos'),
     h('div', { class: 'entre' }, h('div', { class: 'chips', role: 'group', 'aria-label': 'Lenguaje de los retos' }, chipLang('mezcla', 'Los tres'), chipLang('ps', 'PSeInt'), chipLang('py', 'Python'), chipLang('cpp', 'C++')), sel),
     tarjeta,
@@ -626,9 +691,9 @@ function comprobar() {
   const x = D.ejercicioPorId(lab.ejercicio); if (!x || !editor) return;
   resultados = D.compruebaEjercicio(editor.ta.value, lab.lang, x.ej.pruebas);
   if (resultados.every(r => r.ok)) {
-    const r = N.registraEjercicio(P.d, D, lab.ejercicio, lab.lang); P.cambio(); pintaRango(); ultimoFallo = null;
-    if (r.cinturon) U.celebra(r.cinturon, `Dominaste «${x.tema.titulo}» resolviendo su ejercicio. Siguiente tema: «${temaActual().titulo}».`);
-    else aviso(r.nuevo ? `Ejercicio resuelto en ${NL[lab.lang]}: +50 puntos.` : 'Sigue funcionando. Bien.', 5000);
+    const r = N.registraEjercicio(P.d, D, lab.ejercicio, lab.lang); trataPuntos(r, true); ultimoFallo = null;
+    if (r.cinturon) U.celebra(r.cinturon, `Dominaste «${x.tema.titulo}» resolviendo su ejercicio: +${N.PUNTOS.ejercicio + N.PUNTOS.cinturon} puntos. Siguiente tema: «${temaActual().titulo}».`);
+    else aviso(r.nuevo ? `Ejercicio resuelto en ${NL[lab.lang]}: +${N.PUNTOS.ejercicio} puntos.` : 'Sigue funcionando. Bien.', 5000);
   } else {
     const f = resultados.find(r => !r.ok);
     ultimoFallo = f.error ? { tipo: 'error', linea: f.error.linea, mensaje: f.error.message } : { tipo: 'prueba', entradas: f.entradas, esperado: f.esperado, salida: f.salida };
@@ -720,7 +785,7 @@ function pintaVistaHtml() {
   const lec = D.html.find(x => x.id === lab.html), checks = lec.comprobar(doc, src);
   const lista = $('#checks-html'); lista.textContent = '';
   checks.forEach(c => lista.append(h('li', { class: c.ok ? 'si' : '' }, (c.ok ? '✓ ' : '○ ') + c.texto)));
-  if (checks.every(c => c.ok) && !P.d.html[lec.id]) { P.d.html[lec.id] = true; P.d.puntos += 30; P.cambio(); pintaRango(); aviso(`Lección de HTML «${lec.titulo}» completada: +30 puntos.`); }
+  if (checks.every(c => c.ok) && !P.d.html[lec.id]) { P.d.html[lec.id] = true; trataPuntos(N.sumaPuntos(P.d, N.PUNTOS.html), true); aviso(`Lección de HTML «${lec.titulo}» completada: +${N.PUNTOS.html} puntos.`); }
 }
 function pintaHtml() {
   const lec = D.html.find(x => x.id === lab.html) || D.html[0];
@@ -768,10 +833,14 @@ PINTA.plan = function () {
       ...REGLAS.map(r => h('div', { class: 'regla' }, h('span', { class: 'insignia ai' }, r.e), h('div', null, h('h3', null, r.t), h('p', { class: 'tenue' }, r.p), r.f ? h('p', { class: 'fuente' }, 'Fuente: ', h('a', { href: r.u, target: '_blank', rel: 'noopener noreferrer' }, r.f)) : null)))),
     h('section', { class: 'tarjeta' }, h('div', { class: 'entre' }, h('h2', null, 'Prepara el terreno'), h('span', { class: 'insignia' + (hechos === CHECKS.length ? ' bien' : '') }, `${hechos} de ${CHECKS.length}`)),
       h('div', null, ...CHECKS.map(([id, t, s]) => { const c = h('input', { type: 'checkbox', id: 'chk-' + id }); c.checked = !!P.d.plan.checks[id]; c.addEventListener('change', () => { if (c.checked) P.d.plan.checks[id] = true; else delete P.d.plan.checks[id]; P.cambio(); PINTA.plan(); }); return h('div', { class: 'check' }, c, h('label', { for: 'chk-' + id }, t, h('small', null, s))); }))),
+    h('section', { class: 'tarjeta', id: 'puntos' }, h('h2', null, 'Rangos y puntos'),
+      h('p', { class: 'tenue' }, 'Diez rangos, de Aprendiz a Ingeniero de élite. Subes con puntos: cada acierto suma y cada fallo resta, así que no vale responder a lo loco. Para llegar arriba hacen falta meses de práctica casi diaria.'),
+      escaleraRangos(), tablaPuntos()),
     h('section', { class: 'tarjeta' }, h('h2', null, 'Tu regla «si… entonces»'), h('p', { class: 'tenue' }, 'Escríbela con tus palabras. Concreta y con un momento fijo funciona mejor.'), regla),
     h('section', { class: 'tarjeta' }, h('h2', null, 'Ajustes'),
       h('div', { class: 'ajustes' },
         selector('aj-meta', 'Retos al día', aj.meta, [[10, '10'], [20, '20'], [30, '30'], [50, '50']], v => { aj.meta = +v; P.cambio(); }),
+        selector('aj-meta-ingles', 'Ejercicios de inglés al día', aj.metaIngles, [[5, '5'], [10, '10'], [15, '15'], [20, '20']], v => { aj.metaIngles = +v; P.cambio(); }),
         selector('aj-foco', 'Bloque de foco', aj.foco, [[15, '15 min'], [25, '25 min'], [45, '45 min'], [60, '60 min']], v => { aj.foco = +v; P.cambio(); }),
         selector('aj-lang', 'Lenguaje de los retos', aj.lang, [['mezcla', 'Los tres'], ['ps', 'PSeInt'], ['py', 'Python'], ['cpp', 'C++']], v => { aj.lang = v; P.cambio(); reto = null; }),
         selector('aj-aspecto', 'Aspecto', aj.aspecto, [['sistema', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']], v => { aj.aspecto = v; P.cambio(); U.aplicaAspecto(v); }),
@@ -795,7 +864,7 @@ function tarjetaCopia() {
   const salida = h('textarea', { class: 'campo mono', id: 'codigo-progreso', rows: '3', readonly: true, hidden: true, 'aria-label': 'Tu código de progreso' });
   const entrada = h('textarea', { class: 'campo mono', id: 'pegar-progreso', rows: '3', placeholder: 'Pega aquí el código (empieza por DOJO1:)', 'aria-label': 'Código de progreso de otro dispositivo' });
   const cargar = h('button', { class: 'btn', onclick: () => {
-    let d; try { d = N.leeCodigoProgreso(entrada.value, D); } catch (e) { aviso(e.message, 5000); return; }
+    let d; try { d = N.leeCodigoProgreso(entrada.value, D, I); } catch (e) { aviso(e.message, 5000); return; }
     if (!cargaArmada) { cargaArmada = true; cargar.textContent = 'Sustituye el progreso de este dispositivo. Toca otra vez'; setTimeout(() => { if (cargar.isConnected) { cargaArmada = false; cargar.textContent = 'Cargar este progreso'; } }, 4000); return; }
     cargaArmada = false; d.bienvenida = true; P.sustituye(d); reto = null; repintar(); aviso('Progreso cargado.');
   } }, 'Cargar este progreso');
@@ -809,18 +878,24 @@ function tarjetaCopia() {
 function tarjetaPrivacidad() {
   const borrar = h('button', { class: 'btn peligro-suave', onclick: () => {
     if (!borrarArmado) { borrarArmado = true; borrar.textContent = 'Se borra todo y no se puede deshacer. Toca otra vez'; setTimeout(() => { if (borrar.isConnected) { borrarArmado = false; borrar.textContent = 'Borrar mi progreso'; } }, 4000); return; }
-    borrarArmado = false; const n = N.NUEVO(); n.bienvenida = false; P.sustituye(n); reto = null; colaSesion.length = 0; repintar(); ir('hoy'); aviso('Progreso borrado. Empiezas de cero.');
+    borrarArmado = false; const n = N.NUEVO(); n.bienvenida = false; P.sustituye(n); reto = null; colaSesion.length = 0; VI.inicio(); repintar(); ir('hoy'); aviso('Progreso borrado. Empiezas de cero.');
   } }, 'Borrar mi progreso');
   return h('section', { class: 'tarjeta' }, h('h2', null, 'Tus datos'),
     h('p', { class: 'tenue' }, enClaude ? 'Tu progreso se guarda en tu cuenta de Claude, en un espacio privado que solo tú puedes leer.' : 'Tu progreso se guarda solo en este dispositivo. La app no tiene anuncios, no envía datos a ningún servidor y no usa rastreadores.'),
+    h('p', { class: 'tenue' }, enClaude ? 'La voz y el dictado de los ejercicios de inglés los pone Claude; tu voz no se guarda en el Dojo.' : 'Si usas el micrófono en inglés, quien convierte tu voz en texto es el navegador (en Chrome y Edge, con los servidores de Google o de Microsoft). El Dojo solo recibe el texto y no lo guarda.'),
     h('p', { class: 'tenue' }, 'El código que escribes en el laboratorio se ejecuta aquí mismo, en tu dispositivo.'),
     h('div', { class: 'fila' }, borrar));
 }
+
+/* ───────────── INGLÉS (vista-ingles.js) ───────────── */
+const VI = window.VistaIngles({ P, N, I, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, sample: sampleActivo, apagaTutor: () => { tutorApagado = true; }, vista: () => vista });
+PINTA.ingles = () => VI.pinta();
 
 /* ───────────── Arranque ───────────── */
 U.aplicaAspecto(P.d.ajustes.aspecto);
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => U.aplicaAspecto(P.d.ajustes.aspecto));
 document.querySelectorAll('.boton-instalar').forEach(b => b.addEventListener('click', instalar));
+Voz.iniciar(enClaude);
 pintaRango(); pintaBandas(); pintaPie(); pintaInstalar();
 vista = '';
 mostrar(location.hash.slice(1) || 'hoy');

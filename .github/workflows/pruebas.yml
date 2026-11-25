@@ -1,4 +1,4 @@
-# Pruebas automáticas en cada subida: motor, contenido, ejercicios, núcleo y un recorrido completo
+# Pruebas automáticas en cada subida: motor, contenido, ejercicios, inglés, núcleo y un recorrido completo
 # en un navegador real. También comprueba que docs/ (la app publicada) corresponde al código.
 name: Pruebas
 on:
@@ -21,7 +21,9 @@ jobs:
         run: node pruebas/contenido.test.js
       - name: Ejercicios con soluciones de referencia
         run: node pruebas/soluciones.test.js
-      - name: Núcleo (progreso, repaso espaciado, rango)
+      - name: Inglés (contenido, comparadores y miles de ejercicios generados)
+        run: node pruebas/ingles.test.js
+      - name: Núcleo (progreso, puntos y rangos, repaso espaciado, inglés)
         run: node pruebas/nucleo.test.js
       - name: docs/ está al día con el código
         run: python3 construir.py --sin-pruebas && git diff --exit-code -- docs

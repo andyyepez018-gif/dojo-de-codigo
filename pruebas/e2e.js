@@ -9,8 +9,9 @@ fs.mkdirSync(CAPTURAS, { recursive: true });
 let bien = 0, mal = 0; const errores = [];
 const ok = (n, c, det) => { if (c) { bien++; console.log('  ✓ ' + n); } else { mal++; console.log('  ✗ ' + n + (det !== undefined ? ' → ' + JSON.stringify(det).slice(0, 300) : '')); } };
 const pausa = ms => new Promise(r => setTimeout(r, ms));
-async function nueva(b, opts = {}, progreso) {
+async function nueva(b, opts = {}, progreso, antes) {
   const c = await b.newContext(opts);
+  if (antes) await c.addInitScript(antes);
   if (progreso !== undefined) await c.addInitScript(p => { try { if (!localStorage.getItem('dojo-iniciado')) { localStorage.setItem('dojo-progreso', p); localStorage.setItem('dojo-iniciado', '1'); } } catch (e) {} }, JSON.stringify(progreso));
   const p = await c.newPage();
   p.on('pageerror', e => errores.push('pageerror: ' + e.message));
@@ -24,6 +25,7 @@ async function responderReto(p) {
   return 'nada';
 }
 const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+const { vozFalsa, resuelveIngles, cierraFiesta, CURSO } = require('./robot-ingles.js');
 
 (async () => {
   const b = await chromium.launch();
@@ -135,7 +137,8 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 860 } }, v1));
   await p.goto(URL);
   ok('sin bienvenida para quien ya usaba la app', await p.locator('.bienvenida').count() === 0);
-  ok('conserva el cinturón (9.º kyū)', /9\.º kyū/.test(await p.textContent('#rango-lateral')));
+  ok('conserva el cinturón (9.º kyū)', /9\.º kyū/.test(await p.textContent('#v-hoy')));
+  ok('con 120 puntos el rango es Aprendiz', /Aprendiz/.test(await p.textContent('#rango-lateral')));
   ok('conserva puntos y racha', /120 puntos/.test(await p.textContent('#v-hoy')) && /1 día/.test(await p.textContent('#rango-lateral')));
   await p.goto(URL + '#plan');
   ok('conserva la regla', (await p.inputValue('#regla')) === 'Mi regla');
@@ -179,13 +182,106 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
   await c.setOffline(false);
   await c.close();
 
+  console.log('11. Inglés: práctica con voz, micrófono, puntos y subir de rango');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 280 }, vozFalsa));
+  await p.goto(URL + '#ingles'); await p.waitForSelector('.portada-en');
+  ok('la pestaña Inglés está en el menú', await p.locator('#menu-lateral a[href="#ingles"]').count() === 1);
+  ok('dice qué voz y micrófono hay', /voz del dispositivo/.test(await p.textContent('.estado-voz')) && /micrófono del dispositivo/.test(await p.textContent('.estado-voz')));
+  ok('las 12 unidades, en tres niveles', await p.locator('#v-ingles .temas .tema').count() === 12 && /A1 · Principiante/.test(await p.textContent('#v-ingles')) && /B1 · Intermedio/.test(await p.textContent('#v-ingles')));
+  await p.screenshot({ path: path.join(CAPTURAS, '11-ingles.png') });
+  await p.locator('#v-ingles').getByRole('button', { name: 'Practicar', exact: true }).click(); await p.waitForSelector('#v-ingles .ejercicio');
+  const tiposIngles = new Set(); let puntosAntes = 280, sumaOk = true, fiesta = false;
+  for (let k = 0; k < 14; k++) {
+    const t = await resuelveIngles(p, true); tiposIngles.add(t);
+    if (!(await p.locator('#v-ingles .respuesta.si').count())) { sumaOk = false; console.log('     no aceptó la respuesta buena de', t, await p.textContent('#v-ingles .ejercicio')); }
+    if (await p.locator('.capa').count()) { fiesta = fiesta || /Nuevo rango/.test(await p.textContent('.capa')); if (k === 2 || fiesta) await p.screenshot({ path: path.join(CAPTURAS, '12-nuevo-rango.png') }); await cierraFiesta(p); }
+    await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
+  }
+  console.log('     tipos de inglés vistos:', [...tiposIngles].join(', '));
+  ok('el alumno robot acierta todos los tipos que salen', sumaOk);
+  ok('al empezar una unidad sale primero el vocabulario', [...tiposIngles].every(t => ['significado', 'palabra', 'escucha'].includes(t)) || tiposIngles.size > 3);
+  ok('al responder se oye la palabra o la frase', await p.evaluate(() => window.__dicho.length >= 10));
+  ok('subir de 300 puntos celebra el rango «Estudiante de código»', fiesta && /Estudiante de código/.test(await p.textContent('#rango-lateral')));
+  // forzar frases (unidad con ejercicios ya hechos): practicar la unidad 1 hasta ver frases y el micrófono
+  const vistosFrase = new Set();
+  for (let k = 0; k < 30 && !(vistosFrase.has('habla') && vistosFrase.has('ordenar') && vistosFrase.size >= 4); k++) {
+    const t = await resuelveIngles(p, true); vistosFrase.add(t); await cierraFiesta(p);
+    if (!(await p.locator('#v-ingles .respuesta.si').count())) { sumaOk = false; console.log('     no aceptó la respuesta buena de', t); }
+    await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
+  }
+  console.log('     después:', [...vistosFrase].join(', '));
+  ok('salen frases: ordenar, hablar y otras', vistosFrase.has('ordenar') && vistosFrase.has('habla'), [...vistosFrase]);
+  ok('el robot sigue acertando con frases y voz', sumaOk);
+  // un fallo resta
+  let tFallo = await resuelveIngles(p, false);
+  ok(`fallar resta puntos (${tFallo})`, await p.locator('#v-ingles .respuesta.no, #v-ingles .respuesta.casi').count() === 1 && /−\d+ puntos/.test(await p.textContent('#v-ingles .respuesta')), await p.textContent('#v-ingles .respuesta'));
+  await p.screenshot({ path: path.join(CAPTURAS, '13-ingles-fallo.png') });
+  await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
+  // hablar: hasta encontrar un ejercicio de hablar y decirlo bien
+  for (let k = 0; k < 40; k++) { if ((await p.textContent('#v-ingles .reto-cab .etiqueta')).trim() === 'Habla') break; await resuelveIngles(p, true); await cierraFiesta(p); await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio'); }
+  if ((await p.textContent('#v-ingles .reto-cab .etiqueta')).trim() === 'Habla') {
+    await resuelveIngles(p, true);
+    ok('hablar bien: palabras en verde y +12', await p.locator('#v-ingles .palabras-dichas .mal').count() === 0 && /\+1[2-7] puntos/.test(await p.textContent('#v-ingles .respuesta')), await p.textContent('#v-ingles .respuesta'));
+    await p.screenshot({ path: path.join(CAPTURAS, '14-ingles-habla.png') });
+  } else ok('aparece un ejercicio de hablar', false);
+  await c.close();
+
+  console.log('12. Conversación guiada, unidad dominada y bajar de rango');
+  const u1 = CURSO.unidades[0];
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 1000, rangoMax: 2, ingles: { unidades: { u1: { ultimos: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], intentos: 10, aciertos: 10, conversa: 0 } }, tarjetas: {} } }, vozFalsa));
+  await p.goto(URL + '#ingles'); await p.waitForSelector('.portada-en');
+  await p.locator('#v-ingles .portada-en').getByRole('button', { name: 'Conversar' }).click(); await p.waitForSelector('#v-ingles .chat');
+  ok('la conversación empieza con la voz del compañero', (await p.evaluate(() => window.__dicho.at(-1))) === u1.dialogo[0].app);
+  await p.evaluate(() => { window.__oir = 'banana pizza'; }); await p.locator('#v-ingles .microfono').click(); await p.locator('#v-ingles .chat .nota').waitFor();
+  ok('una respuesta sin sentido pide repetir', /No te entendí/.test(await p.textContent('#v-ingles .chat')));
+  for (const t of u1.dialogo) {
+    await p.evaluate(x => { window.__oir = x; }, t.ejemplo);
+    await p.locator('#v-ingles .microfono').click(); await pausa(250);
+  }
+  await p.locator('#v-ingles .conversa .respuesta').waitFor();
+  ok('conversación completada: +40 y unidad dominada (+100)', /Conversación completada/.test(await p.textContent('#v-ingles .conversa')) && /\+140 puntos/.test(await p.textContent('#v-ingles .conversa')), await p.textContent('#v-ingles .conversa'));
+  ok('celebra la unidad dominada', await p.locator('.capa').count() === 1 && /Unidad de inglés dominada/.test(await p.textContent('.capa')));
+  await p.screenshot({ path: path.join(CAPTURAS, '15-conversacion.png') }); await cierraFiesta(p);
+  await p.locator('#v-ingles').getByRole('button', { name: '← Inglés' }).click(); await p.waitForSelector('.portada-en');
+  ok('ahora toca la unidad 2', /Números y símbolos/.test(await p.textContent('#v-ingles .siguiente')));
+  await c.close();
+  // bajar de rango: con 302 puntos (rango 2), un fallo de inglés (−4) baja a Aprendiz
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 302, rangoMax: 1 }, vozFalsa));
+  await p.goto(URL + '#ingles'); await p.waitForSelector('.portada-en');
+  await p.locator('#v-ingles').getByRole('button', { name: 'Practicar', exact: true }).click(); await p.waitForSelector('#v-ingles .ejercicio');
+  tFallo = await resuelveIngles(p, false);
+  ok('fallar bajo el mínimo baja de rango y lo avisa', /Bajaste a «Aprendiz»/.test(await p.textContent('#aviso')) && /Aprendiz/.test(await p.textContent('#rango-lateral')), [tFallo, await p.textContent('#aviso')]);
+  await p.goto(URL + '#hoy'); await p.waitForSelector('.rango-tarjeta');
+  ok('Hoy muestra el rango, los puntos de hoy y el inglés', /Tu rango · 1 de 10/.test(await p.textContent('.rango-tarjeta')) && /Hoy −\d/.test(await p.textContent('.rango-tarjeta')) && /Inglés para programar/.test(await p.textContent('#v-hoy')));
+  await p.locator('.rango-tarjeta summary').click();
+  ok('la escalera tiene los 10 rangos hasta Ingeniero de élite', await p.locator('.rango-tarjeta .escalera li').count() === 10 && /Ingeniero de élite/.test(await p.textContent('.rango-tarjeta .escalera')));
+  await p.screenshot({ path: path.join(CAPTURAS, '16-hoy-rango.png'), fullPage: true });
+  await p.goto(URL + '#plan'); await p.waitForSelector('#puntos');
+  ok('el Plan explica cuánto vale cada cosa', /Reto de código fallado/.test(await p.textContent('#puntos')) && /−5/.test(await p.textContent('#puntos')));
+  await c.close();
+  // sin voz ni micrófono: no salen ejercicios de escuchar ni de hablar, y se puede conversar escribiendo
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, ingles: { unidades: { u2: { ultimos: [1, 1, 1, 1, 1], intentos: 5, aciertos: 5, conversa: 0 } } } },
+    () => { Object.defineProperty(window, 'speechSynthesis', { value: undefined, configurable: true }); window.webkitSpeechRecognition = undefined; window.SpeechRecognition = undefined; }));
+  await p.goto(URL + '#ingles'); await p.waitForSelector('.portada-en');
+  ok('sin voz lo dice', /sin audio/.test(await p.textContent('.estado-voz')) && /sin micrófono/.test(await p.textContent('.estado-voz')));
+  await p.locator('#v-ingles').getByRole('button', { name: 'Practicar', exact: true }).click(); await p.waitForSelector('#v-ingles .ejercicio');
+  const sinVoz = new Set();
+  for (let k = 0; k < 25; k++) { sinVoz.add(await resuelveIngles(p, true)); await cierraFiesta(p); await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio'); }
+  ok('sin voz no hay escucha, dictado ni habla', !sinVoz.has('escucha') && !sinVoz.has('dictado') && !sinVoz.has('habla') && !(await p.locator('#v-ingles .microfono, #v-ingles .oir').count()), [...sinVoz]);
+  await p.locator('#v-ingles').getByRole('button', { name: '← Inglés' }).click();
+  await p.locator('#v-ingles .portada-en').getByRole('button', { name: 'Conversar' }).click(); await p.waitForSelector('#v-ingles .chat');
+  await p.fill('#conv-texto', CURSO.unidades[0].dialogo[0].ejemplo); await p.keyboard.press('Enter');
+  ok('sin micrófono se conversa escribiendo', (await p.locator('#v-ingles .burbuja.yo.bien').count()) === 1);
+  ok('fuera de Claude ofrece copiar la instrucción para el modo de voz de Claude', await p.getByRole('button', { name: 'Copiar la instrucción para Claude' }).count() === 1);
+  await c.close();
+
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');
   for (const esquema of ['light', 'dark']) {
     ({ c, p } = await nueva(b, { ...devices['iPhone 13'], colorScheme: esquema }, { v: 2, bienvenida: true }));
-    for (const v of ['hoy', 'retos', 'ruta', 'lab', 'plan']) {
+    for (const v of ['hoy', 'retos', 'ingles', 'ruta', 'lab', 'plan']) {
       await p.goto(URL + '#' + v); await pausa(250);
       ok(`móvil ${esquema} · ${v} sin desbordar`, await sinDesbordar(p));
-      if (esquema === 'dark' && (v === 'hoy' || v === 'retos' || v === 'lab')) await p.screenshot({ path: path.join(CAPTURAS, `08-movil-${v}.png`) });
+      if (esquema === 'dark' && (v === 'hoy' || v === 'retos' || v === 'lab' || v === 'ingles')) await p.screenshot({ path: path.join(CAPTURAS, `08-movil-${v}.png`) });
     }
     await c.close();
   }

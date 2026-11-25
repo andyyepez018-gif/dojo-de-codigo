@@ -1,7 +1,7 @@
 {
   "name": "Dojo de código",
   "short_name": "Dojo",
-  "description": "Retos de 30 segundos de PSeInt, Python y C++ para las esperas, una ruta de 10 temas y un laboratorio que ejecuta código.",
+  "description": "Retos de 30 segundos de PSeInt, Python y C++ para las esperas, inglés para programar desde cero y diez rangos hasta Ingeniero de élite.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
@@ -11,6 +11,10 @@
   "background_color": "#F1F3F8",
   "theme_color": "#2B4C9B",
   "categories": ["education", "productivity"],
+  "shortcuts": [
+    { "name": "Retos", "short_name": "Retos", "url": "./#retos", "icons": [{ "src": "icono-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Inglés", "short_name": "Inglés", "url": "./#ingles", "icons": [{ "src": "icono-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
   "icons": [
     { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
