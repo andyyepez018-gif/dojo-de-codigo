@@ -391,9 +391,9 @@ function fstringPy(txt, L) {
 
 /* ───────────── Lector de PSeInt ───────────── */
 const FIN_PS = { si: 'FinSi', mientras: 'FinMientras', para: 'FinPara', segun: 'FinSegun', algoritmo: 'FinAlgoritmo', funcion: 'FinFuncion', subproceso: 'FinSubProceso' };
-const INSTR_PS = ['Escribir', 'Leer', 'Definir', 'Dimension', 'Si', 'Mientras', 'Para', 'Repetir', 'Segun'];
+const INSTR_PS = ['Escribir', 'Leer', 'Definir', 'Dimension', 'Si', 'Mientras', 'Para', 'Repetir', 'Segun', 'Borrar', 'Limpiar', 'Esperar'];
 function leerPs(src) {
-  const P = new Lector(escanear(src, 'ps'), 'ps');
+  const P = new Lector(escanear(src, 'ps'), 'ps'); P.avisos = [];
   const funcs = []; let cuerpo = null; const sueltos = [];
   saltaNlPs(P);
   while (P.t.t !== 'eof') {
@@ -407,7 +407,7 @@ function leerPs(src) {
     saltaNlPs(P);
   }
   if (cuerpo && sueltos.length) throw new ErrorDojo('Hay instrucciones fuera del Algoritmo.', sueltos[0].linea, 'Todo lo que hace el programa va entre «Algoritmo nombre» y «FinAlgoritmo».');
-  return { cuerpo: cuerpo || sueltos, funcs };
+  return { cuerpo: cuerpo || sueltos, funcs, avisos: P.avisos };
 }
 function saltaNlPs(P) { while (P.t.t === 'nl' || P.esOp(';')) P.sig(); }
 function finPs(P) {
@@ -429,6 +429,14 @@ function pideIdPs(P, k, msg, pista, L) {
   if (P.tomaId(k)) return;
   throw new ErrorDojo(msg, L || P.t.linea, pista);
 }
+/* «Entonces» y «Hacer» pueden ir al final de la línea o solos en la línea siguiente (estilo clásico de PSeInt) */
+function tomaIdCabecera(P, k) {
+  if (P.tomaId(k)) return true;
+  const g = P.p; saltaNlPs(P);
+  if (P.tomaId(k)) return true;
+  P.p = g; return false;
+}
+function pideCabeceraPs(P, k, msg, pista, L) { if (!tomaIdCabecera(P, k)) throw new ErrorDojo(msg, L || P.t.linea, pista); }
 function lineaDeCaso(P) {
   // ¿La línea que empieza aquí es una etiqueta de caso («1, 2:» o «Caso 3:»)?
   if (P.esId('caso')) return true;
@@ -465,10 +473,11 @@ function stmtPs(P) {
       finPs(P); return { k: 'dimension', ds, linea: L };
     }
     case 'escribir': case 'imprimir': case 'mostrar': {
-      P.sig(); const args = [];
+      P.sig(); const args = []; let salto = true;
+      const sinSalto = () => { if (P.esId('sin') && (P.mira(1).k === 'saltar' || P.mira(1).k === 'bajar')) { P.sig(); P.sig(); salto = false; return true; } return false; };
+      sinSalto();
       if (!(P.t.t === 'nl' || P.t.t === 'eof' || P.esOp(';') || P.esId('sin'))) { do { args.push(exprPs(P)); } while (P.tomaOp(',')); }
-      let salto = true;
-      if (P.esId('sin')) { P.sig(); if (P.esId('saltar') || P.esId('bajar')) P.sig(); salto = false; }
+      if (!sinSalto() && P.esId('sin')) throw P.err('Se escribe «Sin Saltar» (o «Sin Bajar») para seguir en la misma línea.', 'Por ejemplo: Escribir "Hola" Sin Saltar');
       finPs(P); return { k: 'escribir', args, salto, linea: L };
     }
     case 'leer': {
@@ -478,7 +487,7 @@ function stmtPs(P) {
     }
     case 'si': {
       P.sig(); const c = exprPs(P);
-      if (!P.tomaId('entonces')) {
+      if (!tomaIdCabecera(P, 'entonces')) {
         if (P.esOp('<-')) throw P.err('En la condición del Si se compara con «=», no con «<-».', '«<-» guarda un valor; para preguntar si son iguales: Si x = 5 Entonces');
         throw new ErrorDojo('Falta «Entonces» al final de la línea del Si.', L, 'Se escribe: Si condición Entonces');
       }
@@ -488,7 +497,7 @@ function stmtPs(P) {
     }
     case 'mientras': {
       P.sig(); const c = exprPs(P);
-      pideIdPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Mientras.', 'Se escribe: Mientras condición Hacer', L);
+      pideCabeceraPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Mientras.', 'Se escribe: Mientras condición Hacer', L);
       const cuerpo = bloquePs(P, q => q.esId('finmientras'), { que: 'Mientras', fin: 'FinMientras', linea: L });
       P.sig(); finPs(P); return { k: 'mientras', c, cuerpo, linea: L };
     }
@@ -502,19 +511,28 @@ function stmtPs(P) {
     }
     case 'para': {
       P.sig(); const v = P.sig(); if (v.t !== 'id') throw P.err('Después de «Para» va el nombre de la variable que cuenta.', 'Por ejemplo: Para i <- 1 Hasta 10 Hacer', v);
-      if (P.esId('cada')) throw P.err('«Para Cada» no está disponible aquí: usa Para i <- 1 Hasta n.');
+      if (v.k === 'cada' && P.t.t === 'id' && P.mira(1).t === 'id' && P.mira(1).k === 'de') {
+        const x = P.sig(); P.sig(); const arr = postPs(P);
+        if (arr.k !== 'var') throw new ErrorDojo('«Para Cada» recorre un arreglo: se escribe  Para Cada x de arreglo Hacer', L);
+        pideCabeceraPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Para Cada.', 'Por ejemplo: Para Cada x de v Hacer', L);
+        const cuerpo = bloquePs(P, q => q.esId('finpara'), { que: 'Para', fin: 'FinPara', linea: L });
+        P.sig(); finPs(P); return { k: 'paracadaps', v: { k: 'var', n: x.v, id: x.k, linea: L }, arr, cuerpo, linea: L };
+      }
       if (!P.tomaOp('<-') && !P.tomaOp('=')) throw P.err('Falta «<-» después de la variable del Para.', 'Por ejemplo: Para i <- 1 Hasta 10 Hacer');
       const desde = exprPs(P);
       pideIdPs(P, 'hasta', 'Falta «Hasta» en el Para.', 'Por ejemplo: Para i <- 1 Hasta 10 Hacer', L);
       const hasta = exprPs(P); let paso = null;
       if (P.tomaId('con')) { pideIdPs(P, 'paso', 'Falta «Paso»: se escribe  Con Paso 2', '', L); paso = exprPs(P); }
-      pideIdPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Para.', 'Por ejemplo: Para i <- 1 Hasta 10 Hacer', L);
+      const numLit = e => e.k === 'num' ? Number(e.v) : e.k === 'un' && e.op === '-' && e.a.k === 'num' ? -Number(e.a.v) : null;
+      if (!paso && numLit(desde) !== null && numLit(hasta) !== null && numLit(desde) > numLit(hasta))
+        P.avisos.push({ linea: L, texto: `Este Para va de ${numLit(desde)} a ${numLit(hasta)} sin «Con Paso -1»: suma 1 en cada vuelta, así que no da ninguna. Para contar hacia atrás escribe «Con Paso -1».` });
+      pideCabeceraPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Para.', 'Por ejemplo: Para i <- 1 Hasta 10 Hacer', L);
       const cuerpo = bloquePs(P, q => q.esId('finpara'), { que: 'Para', fin: 'FinPara', linea: L });
       P.sig(); finPs(P); return { k: 'para', v: { k: 'var', n: v.v, id: v.k, linea: L }, desde, hasta, paso, cuerpo, linea: L };
     }
     case 'segun': {
       P.sig(); const e = exprPs(P);
-      pideIdPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Segun.', 'Se escribe: Segun variable Hacer', L);
+      pideCabeceraPs(P, 'hacer', 'Falta «Hacer» al final de la línea del Segun.', 'Se escribe: Segun variable Hacer', L);
       saltaNlPs(P); const casos = []; let otro = null;
       const finCaso = q => q.esId('finsegun') || (q.esId('de') && q.mira(1).k === 'otro') || lineaDeCaso(q);
       while (!P.esId('finsegun')) {
@@ -528,7 +546,10 @@ function stmtPs(P) {
       }
       P.sig(); finPs(P); return { k: 'segun', e, casos, otro, caida: false, linea: L };
     }
-    case 'esperar': case 'borrar': case 'limpiar':
+    case 'borrar': case 'limpiar':
+      P.sig(); if (!P.tomaId('pantalla')) throw P.err(`Se escribe «${t.v} Pantalla».`, 'Borra todo lo que se había mostrado.');
+      finPs(P); return { k: 'borrapantalla', linea: L };
+    case 'esperar':
       while (!(P.t.t === 'nl' || P.t.t === 'eof' || P.esOp(';'))) P.sig(); finPs(P); return { k: 'pass', linea: L };
     default: {
       if (t.k.startsWith('fin') || ['sino', 'hasta', 'entonces', 'hacer'].includes(t.k))
@@ -934,13 +955,13 @@ class Maquina {
     this.prog = prog; this.lang = lang; this.out = []; this.eventos = []; this.pasos = 0; this.prof = 0;
     this.funcs = new Map(); this.globales = new Ambito(null); this.buf = ''; this.linea = 0; this.importados = new Set();
     this.limite = opciones.limite || LIMITE_PASOS; this.traza = opciones.traza ? [] : null; this.trazaCortada = false;
-    this.pila = []; this.nSalida = 0; this.pausas = !!opciones.pausas; this.maxSalida = opciones.maxSalida || 200000; this.declarados = new Set(); this.cout = { fixed: false, prec: 6, ancho: 0, izq: false };
+    this.pila = []; this.nSalida = 0; this.borrado = 0; this.pausas = !!opciones.pausas; this.maxSalida = opciones.maxSalida || 200000; this.declarados = new Set(); this.cout = { fixed: false, prec: 6, ancho: 0, izq: false };
   }
   /* Paso a paso: una foto de la línea, las variables visibles y cuánto se había mostrado */
   marca(linea, amb) {
     if (!this.traza) return;
     if (this.traza.length >= MAX_TRAZA) { this.trazaCortada = true; return; }
-    this.traza.push({ linea, vars: this.instantanea(amb), salida: this.nSalida, pila: this.pila.slice() });
+    this.traza.push({ linea, vars: this.instantanea(amb), salida: this.nSalida, desde: this.borrado, pila: this.pila.slice() });
   }
   instantanea(amb) {
     const vars = [], vistos = new Set();
@@ -982,6 +1003,8 @@ class Maquina {
     const u = this.eventos[this.eventos.length - 1];
     if (u && u.t === 'out') u.s += s; else this.eventos.push({ t: 'out', s });
   }
+  /* Borrar Pantalla: lo mostrado antes ya no se ve (la salida empieza de nuevo aquí) */
+  borra() { this.borrado = this.nSalida; this.eventos.push({ t: 'borrar' }); }
   *pideLinea() { const v = yield { pide: true }; const s = v == null ? '' : String(v); this.eventos.push({ t: 'in', s }); return s; }
   paso(L) {
     if (++this.pasos > this.limite) throw new ErrorDojo(`El programa dio más de ${this.limite.toLocaleString('es-ES')} pasos y lo detuve. ¿Hay un bucle que nunca termina?`, L || this.linea, 'Revisa que dentro del bucle cambie algo que haga falsa la condición alguna vez.');
@@ -1076,7 +1099,7 @@ class Maquina {
         return;
       case 'para': {
         const ini = yield* this.ev(s.desde, amb), fin = yield* this.ev(s.hasta, amb);
-        const pa = s.paso ? yield* this.ev(s.paso, amb) : 1;
+        const pa = s.paso ? yield* this.ev(s.paso, amb) : 1;   // como dice la ayuda de PSeInt: sin «Con Paso», suma 1
         if (!esNum(ini) || !esNum(fin) || !esNum(pa)) throw new ErrorDojo('El Para cuenta con números: revisa el inicio, el final y el paso.', s.linea);
         const p = N(pa); if (p === 0) throw new ErrorDojo('El paso del Para no puede ser 0.', s.linea);
         let i = N(ini); const f = N(fin);
@@ -1102,6 +1125,24 @@ class Maquina {
         }
         return;
       }
+      case 'paracadaps': {
+        // Recorre todas las casillas del arreglo (también las de 2 dimensiones, fila a fila).
+        // Como en PSeInt, cambiar la variable dentro del bucle cambia la casilla.
+        const arr = yield* this.ev(s.arr, amb);
+        if (!Array.isArray(arr)) throw new ErrorDojo(`«${s.arr.n}» no es un arreglo: Para Cada recorre arreglos.`, s.linea, 'Créalo antes con Dimension, por ejemplo: Dimension v[5]');
+        const casillas = []; const junta = a => { for (let k = 0; k < a.length; k++) { if (Array.isArray(a[k])) junta(a[k]); else casillas.push([a, k]); } }; junta(arr);
+        for (let k = 0; k < casillas.length; k++) {
+          const [fila, j] = casillas[k];
+          this.paso(s.linea); if (k) this.marca(s.linea, amb);
+          if (fila[j] === undefined) throw new ErrorDojo(`La casilla ${k + 1} de «${s.arr.n}» todavía no tiene valor.`, s.linea, 'Dale valor a todas las casillas antes de recorrerlas.');
+          yield* this.asignar(s.v, fila[j], amb, s.linea);
+          const r = yield* this.vuelta(s.cuerpo, amb);
+          fila[j] = yield* this.ev(s.v, amb);
+          if (r === 'break') break;
+        }
+        return;
+      }
+      case 'borrapantalla': this.borra(); return;
       case 'forc': {
         const sc = new Ambito(amb);
         if (s.init) yield* this.exec(s.init, sc);
@@ -1719,6 +1760,8 @@ class Maquina {
       case 'azar': return Math.floor(Math.random() * numk(0));
       case 'aleatorio': { const a = numk(0), b = numk(1); return a + Math.floor(Math.random() * (b - a + 1)); }
       case 'sen': return Math.sin(numk(0)); case 'cos': return Math.cos(numk(0)); case 'tan': return Math.tan(numk(0));
+      case 'asen': case 'acos': { const x = numk(0); if (x < -1 || x > 1) throw new ErrorDojo(`${e.f} solo acepta números entre -1 y 1.`, L); return n === 'asen' ? Math.asin(x) : Math.acos(x); }
+      case 'atan': return Math.atan(numk(0));
       case 'ln': return Math.log(numk(0)); case 'exp': return Math.exp(numk(0));
       case 'longitud': return txt(0).length;
       case 'mayusculas': return txt(0).toUpperCase();
@@ -1876,7 +1919,7 @@ const MATH_PY = {
   fabs: x => R(Math.abs(x)), trunc: x => Math.trunc(x), sin: x => R(Math.sin(x)), cos: x => R(Math.cos(x)), log: x => R(Math.log(x))
 };
 const INTEGRADAS_PY = ['print', 'input', 'int', 'float', 'str', 'bool', 'len', 'range', 'abs', 'round', 'max', 'min', 'sum', 'sorted', 'list', 'dict', 'type', 'reversed', 'enumerate', 'ord', 'chr'];
-const INTEGRADAS_PS = ['RAIZ', 'ABS', 'TRUNC', 'REDON', 'AZAR', 'ALEATORIO', 'Longitud', 'Mayusculas', 'Minusculas', 'Subcadena', 'Concatenar', 'ConvertirANumero', 'ConvertirATexto'];
+const INTEGRADAS_PS = ['RAIZ', 'RC', 'ABS', 'LN', 'EXP', 'SEN', 'COS', 'TAN', 'ASEN', 'ACOS', 'ATAN', 'TRUNC', 'REDON', 'AZAR', 'ALEATORIO', 'Longitud', 'Mayusculas', 'Minusculas', 'Subcadena', 'Concatenar', 'ConvertirANumero', 'ConvertirATexto'];
 const INTEGRADAS_CPP = ['setprecision', 'setw', 'sqrt', 'pow', 'abs', 'fabs', 'floor', 'ceil', 'round', 'max', 'min', 'to_string', 'stoi', 'stod', 'getline', 'swap', 'sort', 'reverse', 'toupper', 'tolower', 'isdigit', 'isalpha'];
 
 /* ───────────── Lo que usa la app ───────────── */
@@ -1890,11 +1933,11 @@ function crear(src, lang, opciones) {
   }
   const m = new Maquina(prog, lang, opciones); const gen = m.correr(); let fin = false;
   return {
-    maquina: m, eventos: m.eventos, avisos: prog.avisos || [], salida: () => m.out.join(''),
+    maquina: m, eventos: m.eventos, avisos: prog.avisos || [], salida: () => m.out.join('').slice(m.borrado),
     traza: () => {
       if (!m.traza) return [];
       const u = m.traza[m.traza.length - 1];
-      if (fin && (!u || (!u.fin && !u.error))) m.traza.push({ linea: 0, vars: u ? u.vars : [], salida: m.nSalida, pila: [], fin: true });
+      if (fin && (!u || (!u.fin && !u.error))) m.traza.push({ linea: 0, vars: u ? u.vars : [], salida: m.nSalida, desde: m.borrado, pila: [], fin: true });
       return m.traza;
     },
     avanzar(entrada) {
@@ -1902,7 +1945,7 @@ function crear(src, lang, opciones) {
       try { const r = gen.next(entrada); if (r.done) { fin = true; return { estado: 'fin' }; } return { estado: r.value && r.value.pausa ? 'pausa' : 'pide' }; }
       catch (e) {
         fin = true;
-        if (e instanceof ErrorDojo) { if (m.traza) m.traza.push({ linea: e.linea, vars: [], salida: m.nSalida, pila: m.pila.slice(), error: e.message }); return { estado: 'error', error: e }; }
+        if (e instanceof ErrorDojo) { if (m.traza) m.traza.push({ linea: e.linea, vars: [], salida: m.nSalida, desde: m.borrado, pila: m.pila.slice(), error: e.message }); return { estado: 'error', error: e }; }
         if (e instanceof RangeError) return { estado: 'error', error: new ErrorDojo('El programa se metió en demasiadas llamadas.', m.linea, '¿Una función que se llama a sí misma sin parar?') };
         return { estado: 'error', error: new ErrorDojo('Fallo interno del Dojo: ' + e.message, m.linea, 'Esto es un error de la app, no tuyo.') };
       }

@@ -34,7 +34,7 @@ function aviso(texto, ms = 3400) {
 
 /* ── Resaltado ── */
 const KW = {
-  ps: new Set('algoritmo finalgoritmo proceso finproceso definir como entero real caracter cadena texto logico numero dimension dimensionar escribir imprimir mostrar leer si entonces sino finsi mientras hacer finmientras para hasta con paso finpara repetir que segun finsegun de otro modo caso funcion finfuncion subproceso finsubproceso por referencia valor y o no mod sin saltar bajar verdadero falso'.split(' ')),
+  ps: new Set('algoritmo finalgoritmo proceso finproceso definir como entero real caracter cadena texto logico numero dimension dimensionar escribir imprimir mostrar leer si entonces sino finsi mientras hacer finmientras para hasta con paso finpara repetir que segun finsegun de otro modo caso funcion finfuncion subproceso finsubproceso subalgoritmo finsubalgoritmo por referencia valor y o no mod sin saltar bajar verdadero falso cada borrar limpiar pantalla esperar tecla segundos milisegundos numerico'.split(' ')),
   py: new Set('def return if elif else while for in and or not is True False None break continue pass import from global del lambda'.split(' ')),
   cpp: new Set('int double float bool char string void auto vector if else while for do return break continue switch case default true false using namespace std const include long short unsigned static_cast'.split(' '))
 };
@@ -45,7 +45,7 @@ const FN = {
 };
 /* Palabras de control (deciden por dónde sigue el programa): VS Code las pinta de otro color (morado) */
 const CTL = {
-  ps: new Set('si entonces sino finsi mientras hacer finmientras para hasta con paso finpara repetir que segun finsegun caso de otro modo'.split(' ')),
+  ps: new Set('si entonces sino finsi mientras hacer finmientras para cada hasta con paso finpara repetir que segun finsegun caso de otro modo'.split(' ')),
   py: new Set('if elif else while for in return break continue pass'.split(' ')),
   cpp: new Set('if else while for do return break continue switch case default'.split(' '))
 };

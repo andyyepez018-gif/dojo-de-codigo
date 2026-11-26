@@ -17,6 +17,8 @@ jobs:
           node-version: 22
       - name: Motor (PSeInt, Python y C++)
         run: node pruebas/motor.test.js
+      - name: PSeInt completo
+        run: node pruebas/pseint.test.js
       - name: Contenido (miles de retos generados)
         run: node pruebas/contenido.test.js
       - name: Ejercicios con soluciones de referencia

@@ -835,7 +835,10 @@ function abrirLab(o = {}) {
 }
 function pintaEventos(caja, eventos) {
   caja.textContent = '';
-  for (const ev of eventos) caja.append(ev.t === 'out' ? document.createTextNode(ev.s) : h('span', { class: 'in' }, ev.s + '\n'));
+  for (const ev of eventos) {
+    if (ev.t === 'borrar') { caja.textContent = ''; continue; }   // Borrar Pantalla
+    caja.append(ev.t === 'out' ? document.createTextNode(ev.s) : h('span', { class: 'in' }, ev.s + '\n'));
+  }
 }
 function pintaAvisos() {
   const caja = $('#avisos-lab'); if (!caja) return; caja.textContent = '';
@@ -923,7 +926,7 @@ function vistaTraza() {
   return [h('div', { class: 'entre' }, volver, h('span', { class: 'tenue', style: 'font-size:12.5px' }, 'Teclado: ← y → para moverte')),
     h('section', { class: 'tarjeta traza' }, controles, rango, estado,
       h('div', { class: 'dos' }, h('div', { class: 'pila' }, codigo), h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, 'Variables'), vars,
-        h('span', { class: 'etiqueta' }, 'Lo que se ha mostrado'), salidaBloque(T.salida.slice(0, p.salida)))),
+        h('span', { class: 'etiqueta' }, 'Lo que se ha mostrado'), salidaBloque(T.salida.slice(p.desde || 0, p.salida)))),
       T.cortada ? h('p', { class: 'tenue', style: 'font-size:13px' }, 'Solo se registran los primeros 3.000 pasos.') : null),
     panelDatos];
 }

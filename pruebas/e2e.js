@@ -95,6 +95,19 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   ok('error con su línea marcada en el editor', /Línea 4/.test(await p.textContent('#consola .err')) && await p.locator('.editor .numeros .err').textContent() === '4');
   await p.screenshot({ path: path.join(CAPTURAS, '04-lab-error.png'), fullPage: true });
 
+  // PSeInt completo en el laboratorio: Borrar Pantalla, Para Cada y el aviso del Para hacia atrás
+  await p.locator('#v-lab .chip', { hasText: 'PSeInt' }).click();
+  await p.fill('#editor-codigo', 'Algoritmo prueba\n    Escribir "antes"\n    Borrar Pantalla\n    Dimension v[3]\n    v[1] <- 4\n    v[2] <- 5\n    v[3] <- 6\n    Para Cada x de v Hacer\n        Escribir x Sin Saltar\n    FinPara\n    Para i <- 3 Hasta 1 Hacer\n        Escribir i\n    FinPara\nFinAlgoritmo\n');
+  await p.click('#btn-ejecutar'); await p.locator('#consola', { hasText: /fin del programa/ }).waitFor({ timeout: 15000 });
+  { const c = await p.textContent('#consola'); ok('PSeInt: Borrar Pantalla limpia la consola y Para Cada recorre', /^456/.test(c) && !/antes/.test(c), c); }
+  ok('PSeInt: aviso del Para hacia atrás sin Con Paso', /Aviso, línea 11/.test(await p.textContent('#avisos-lab')), await p.textContent('#avisos-lab'));
+  await p.getByRole('button', { name: 'Paso a paso' }).click(); await p.waitForSelector('.controles-traza');
+  await p.keyboard.press('ArrowRight');   // paso 2: en la línea 3 (Borrar Pantalla), ya se escribió «antes»
+  ok('PSeInt paso a paso: antes de borrar se ve lo escrito', /antes/.test(await p.locator('.traza .salida').last().textContent()));
+  await p.getByRole('button', { name: 'Último paso' }).click();
+  { const t = await p.locator('.traza .salida').last().textContent(); ok('PSeInt paso a paso: al final solo lo de después de borrar', /456/.test(t) && !/antes/.test(t), t); }
+  await p.getByRole('button', { name: '← Volver al editor' }).click(); await p.waitForSelector('#editor-codigo');
+
   console.log('4. Paso a paso');
   await p.locator('#v-lab .chip', { hasText: 'Python' }).click();
   await p.fill('#editor-codigo', 'def doble(x):\n    y = x * 2\n    return y\n\nn = int(input())\nm = doble(n)\nprint("Resultado:", m)\n');
