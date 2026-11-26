@@ -3,6 +3,7 @@ globalThis.Motor = require('../motor.js');
 const D = require('../contenido.js');
 const I = require('../ingles.js');
 const J = require('../habla.js');
+const E = require('../escribir.js');
 const N = require('../nucleo.js');
 let bien = 0, mal = 0;
 const ok = (nombre, cond, detalle) => { if (cond) bien++; else { mal++; console.log('✗ ' + nombre + (detalle !== undefined ? ' → ' + JSON.stringify(detalle) : '')); } };
@@ -81,7 +82,16 @@ ok('mínimos crecientes', N.RANGOS.every((r, k) => k === 0 ? r.min === 0 : r.min
 ok('rango con 0 puntos', N.rangoDe(0).i === 0 && N.rangoDe(299).i === 0 && N.rangoDe(300).i === 1, N.rangoDe(300));
 ok('rango máximo', N.rangoDe(30000).i === 9 && N.rangoDe(1e7).siguiente === null && N.rangoDe(1e7).prop === 1);
 ok('faltan y progreso', N.rangoDe(650).faltan === 350 && Math.abs(N.rangoDe(650).prop - 0.5) < 1e-9, N.rangoDe(650));
-const ga = N.normaliza({ v: 2, bienvenida: true, puntos: 295, examenes: {} }, D, I);
+const sinProy = N.normaliza({ v: 2, bienvenida: true, puntos: 400, examenes: {} }, D, I);
+ok('con los puntos pero sin el proyecto, el examen no se abre', !N.estadoExamen(sinProy).disponible && N.estadoExamen(sinProy).proyecto === 0 && N.siguientePaso(sinProy, D, {}, I).id === 'proyecto');
+let rpp = N.registraPaso(sinProy, 1, 0, false);
+ok('un paso del proyecto mal resta 5', rpp.puntos === -5 && (sinProy.proyectos[1] || 0) === 0);
+rpp = N.registraPaso(sinProy, 1, 0, true); N.registraPaso(sinProy, 1, 1, true);
+ok('cada paso bien +40', rpp.puntos === 40 && sinProy.proyectos[1] === 1 + 1);
+rpp = N.registraPaso(sinProy, 1, 2, true);
+ok('terminar el proyecto +140 y abre el examen', rpp.terminado && rpp.puntos === 140 && rpp.cambio && rpp.cambio.tipo === 'examen' && N.estadoExamen(sinProy).disponible, rpp);
+ok('repetir un paso ya hecho no da puntos', N.registraPaso(sinProy, 1, 0, true).puntos === 0);
+const ga = N.normaliza({ v: 2, bienvenida: true, puntos: 295, examenes: {}, proyectos: { 1: 3, 2: 3 } }, D, I);
 let rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: true });
 ok('llegar a los puntos NO sube: abre el examen', rr.cambio && rr.cambio.tipo === 'examen' && rr.cambio.i === 1 && ga.rangoMax === 0 && N.rangoActual(ga).i === 0, rr);
 ok('equivocarse resta 5 y corta la racha', N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: false }).puntos === -5 && ga.combo === 0 && ga.puntos === 300);
@@ -101,7 +111,7 @@ rx = N.registraExamen(ga, 1, { bien: 9, total: 12 });
 ok('aprobar (75 %) sube de rango y da +150', rx.aprobado && rx.cambio.tipo === 'sube' && ga.rangoMax === 1 && N.rangoActual(ga).i === 1 && rx.puntos === 150, rx);
 ok('el historial guarda los dos intentos', ga.examenes.historial.length === 2 && ga.examenes.historial[1].aprobado);
 ok('la multa crece con el rango (10 % del mínimo, al menos 50)', N.multaExamen(1) === 50 && N.multaExamen(2) === 100 && N.multaExamen(9) === 3000);
-const gm = N.normaliza({ puntos: 5000, rangoMax: 0, examenes: {} }, D, I, J); N.registraExamen(gm, 1, { bien: 0, total: 12 });
+const gm = N.normaliza({ puntos: 5000, rangoMax: 0, examenes: {}, proyectos: { 1: 3 } }, D, I, J); N.registraExamen(gm, 1, { bien: 0, total: 12 });
 ok('con puntos de sobra, para repetir hay que volver a los de antes', gm.puntos === 4950 && N.estadoExamen(gm).objetivo === 5000 && N.estadoExamen(gm).espera === 50);
 ok('abandonar cuenta como suspenso', !N.registraExamen(N.normaliza({ puntos: 400, examenes: {} }, D, I), 1, { bien: 10, total: 10, abandonado: true }).aprobado);
 const gb = N.normaliza({ v: 2, puntos: 302, rangoMax: 1, examenes: {} }, D, I);
@@ -110,22 +120,24 @@ ok('bajar de los puntos del rango avisa «baja»', rb.cambio && rb.cambio.tipo =
 rb = N.sumaPuntos(gb, 10);
 ok('volver a subir avisa «recupera», sin repetir el examen', rb.cambio && rb.cambio.tipo === 'recupera' && N.rangoActual(gb).i === 1, rb);
 ok('quien venía de antes conserva su rango sin examen', N.normaliza({ puntos: 5000 }, D, I).rangoMax === 4 && N.normaliza({ puntos: 5000, examenes: {} }, D, I).rangoMax === 0);
-ok('con 5000 puntos y sin exámenes aprobados eres Aprendiz con el examen 2 pendiente', (() => { const x = N.normaliza({ puntos: 5000, examenes: {} }, D, I); return N.rangoActual(x).i === 0 && N.estadoExamen(x).rango === 1 && N.estadoExamen(x).disponible; })());
+ok('con 5000 puntos y sin exámenes aprobados eres Aprendiz con el examen 2 pendiente', (() => { const x = N.normaliza({ puntos: 5000, examenes: {}, proyectos: { 1: 3 } }, D, I); return N.rangoActual(x).i === 0 && N.estadoExamen(x).rango === 1 && N.estadoExamen(x).disponible; })());
 ok('cada rango dice qué debe saber (código, inglés y habla)', N.RANGOS.every(R => Array.isArray(R.sabe) && R.sabe.length === 3));
 ok('el repaso guardado se limpia al normalizar', N.normaliza({ examenes: { repaso: [{ area: 'codigo', spec: { tpl: 'comas', lang: 'py', seed: 3 } }, { area: 'x', spec: {} }, { area: 'habla', spec: { bloque: 'b9', seed: 1 } }] } }, D, I, J).examenes.repaso.length === 1);
 ok('cada rango (2 a 10) tiene examen, cada vez más grande y exigente', N.RANGOS.slice(1).every((R, k, a) => R.examen && (k === 0 || (R.examen.preguntas >= a[k - 1].examen.preguntas && R.examen.nota >= a[k - 1].examen.nota && R.examen.temas >= a[k - 1].examen.temas && R.examen.unidades >= a[k - 1].examen.unidades))));
-ok('el último examen cubre los 10 temas, las 12 unidades y los 6 bloques de habla', N.RANGOS[9].examen.temas === 10 && N.RANGOS[9].examen.unidades === 12 && N.RANGOS[9].examen.bloques === 6);
+ok('el último examen cubre todo: 10 temas, todas las unidades y todos los bloques', N.RANGOS[9].examen.temas === D.temas.length && N.RANGOS[9].examen.unidades === I.unidades.length && N.RANGOS[9].examen.bloques === J.bloques.length);
 for (let k = 1; k < 10; k++) {
   for (const sale of [false, true]) {
-    const plan = N.planExamen(D, I, k, 1234 + k, { sale }, J), R = N.RANGOS[k].examen;
-    const cod = plan.filter(x => x.area === 'codigo'), ing = plan.filter(x => x.area === 'ingles'), hab = plan.filter(x => x.area === 'habla');
+    const plan = N.planExamen(D, I, k, 1234 + k, { sale }, J, E), R = N.RANGOS[k].examen;
+    const esc = plan.filter(x => x.area === 'escribe');
+    ok(`examen ${k + 1}: hay que escribir código desde cero (${k <= 2 ? 1 : 2}) de los temas que entran`, esc.length === (k <= 2 ? 1 : 2) && esc.every(x => E.porId[x.spec.tarea] && D.temas.findIndex(t => t.id === x.tema) < R.temas));
+    const cod = plan.filter(x => x.area === 'codigo' || x.area === 'escribe'), ing = plan.filter(x => x.area === 'ingles'), hab = plan.filter(x => x.area === 'habla');
     const temas = new Set(cod.map(x => x.tema)), unidades = new Set(ing.map(x => x.unidad)), bloques = new Set(hab.map(x => x.bloque));
     ok(`examen ${k + 1}: ${R.preguntas} preguntas de código, inglés y habla`, plan.length === R.preguntas && cod.length && ing.length && hab.length);
     ok(`examen ${k + 1}: entra todo lo de ese rango y nada de más`, temas.size >= Math.min(R.temas, cod.length - 1) && unidades.size >= Math.min(R.unidades, ing.length - 1) && bloques.size >= Math.min(R.bloques, hab.length - 1)
       && cod.every(x => D.temas.findIndex(t => t.id === x.tema) < R.temas) && ing.every(x => I.porId[x.unidad].n <= R.unidades) && hab.every(x => J.porId[x.bloque].n <= R.bloques), [temas.size, unidades.size, bloques.size]);
     ok(`examen ${k + 1}: lo más nuevo del rango siempre entra`, temas.has(D.temas[R.temas - 1].id) && unidades.has(I.unidades[R.unidades - 1].id) && bloques.has(J.bloques[R.bloques - 1].id));
     ok(`examen ${k + 1}: escuchar solo si hay voz; nunca hablar`, plan.every(x => x.area !== 'ingles' || x.spec.tipo !== 'habla') && (sale || plan.every(x => !['escucha', 'dictado'].includes(x.spec.tipo))));
-    let generadas = 0; for (const x of plan) { try { const g = x.area === 'codigo' ? (D.generar(x.spec) || D.generar({ ...x.spec, tipo: 'salida' })) : x.area === 'ingles' ? I.generar(x.spec, { sale, entra: false }) : J.generar(x.spec); if (g) generadas++; } catch (e) {} }
+    let generadas = 0; for (const x of plan) { try { const g = x.area === 'escribe' ? E.porId[x.spec.tarea] : x.area === 'codigo' ? (D.generar(x.spec) || D.generar({ ...x.spec, tipo: 'salida' })) : x.area === 'ingles' ? I.generar(x.spec, { sale, entra: false }) : J.generar(x.spec); if (g) generadas++; } catch (e) {} }
     ok(`examen ${k + 1}: todas las preguntas se generan`, generadas === plan.length, generadas);
   }
 }
@@ -140,6 +152,11 @@ for (let k = 0; k < 9; k++) N.registraJerga(hj, J, { bloque: 'b1', item: 'b1:buc
 ok('dominar un bloque pasa al siguiente', N.estadoBloque(hj, J, 'b1').dominado && N.bloqueActual(hj, J).id === 'b2');
 ok('fallar un ejercicio del laboratorio resta 5', N.registraFallo(hj, N.PUNTOS.ejercicioFallo).delta === -5);
 ok('un turno de conversación no entendido resta 2', N.registraFallo(hj, N.PUNTOS.conversaFallo).delta === -2);
+const ew = N.normaliza({ puntos: 50 }, D, I, J);
+ok('escribir bien vale 15', N.registraReto(ew, D, { tema: 'leer', tarea: 'doble', lang: 'py', ok: true, tipo: 'escribe' }).puntos === 15 && ew.escritos.doble.aciertos === 1);
+ok('completar una línea vale 12 (+racha)', N.registraReto(ew, D, { tema: 'leer', tpl: 'suma-dos', lang: 'py', ok: true, tipo: 'completa' }).puntos === 13);
+ok('escribir mal resta 5', N.registraReto(ew, D, { tema: 'leer', tarea: 'doble', lang: 'py', ok: false, tipo: 'escribe' }).puntos === -5 && ew.escritos.doble.fallos === 1);
+ok('normaliza escritos y proyectos', (() => { const z = N.normaliza({ escritos: { doble: { aciertos: 2 }, 'MAL ID': {} }, proyectos: { 1: 9, x: 2, 3: 1 } }, D, I, J); return z.escritos.doble.aciertos === 2 && !z.escritos['MAL ID'] && z.proyectos[1] === 3 && z.proyectos[3] === 1 && !z.proyectos.x; })());
 ok('el código de progreso lleva la habla y los exámenes', JSON.stringify(N.leeCodigoProgreso(N.codigoProgreso(hj), D, I, J).jerga) === JSON.stringify(hj.jerga));
 const g3 = N.normaliza({ v: 2, puntos: 3 }, D, I);
 ok('los puntos nunca bajan de 0', N.sumaPuntos(g3, -50).delta === -3 && g3.puntos === 0);

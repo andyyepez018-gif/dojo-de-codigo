@@ -41,12 +41,14 @@ async function resuelveIngles(p, bien = true) {
   catch (e) { throw new Error(`el ejercicio «${tipo}» no se pudo responder: ${(await p.textContent('#v-ingles .ejercicio')).slice(0, 300)}`); }
   return tipo;
 }
-const cierraFiesta = async p => { if (await p.locator('.capa').count()) await p.locator('.capa').getByRole('button', { name: /^(Seguir|Luego)$/ }).click(); };
+const cierraFiesta = async p => { for (let k = 0; k < 4 && await p.locator('.capa').count(); k++) await p.locator('.capa').getByRole('button', { name: /^(Seguir|Luego)$/ }).click(); };
 /* Responde la pregunta del examen en pantalla, bien o mal a propósito (lee el examen con el gancho de pruebas) */
 async function resuelveExamen(p, bien = true) {
-  const q = await p.evaluate(() => { const st = window.__examen(), x = st.preguntas[st.i]; return JSON.parse(JSON.stringify({ area: x.area, r: x.r, e: x.e })); });
-  const t = q.area === 'codigo' ? q.r.tipo : q.e.tipo, x = q.area === 'codigo' ? q.r : q.e;
-  if (q.area === 'codigo' && t === 'error') await p.locator('#v-examen .codigo li').nth(bien ? x.lineaMal : (x.lineaMal + 1) % x.codigoMal.replace(/\n+$/, '').split('\n').length).click();
+  const q = await p.evaluate(() => { const st = window.__examen(), x = st.preguntas[st.i]; return JSON.parse(JSON.stringify({ area: x.area, r: x.r, e: x.e, tarea: x.tarea, lang: x.lang })); });
+  const t = q.area === 'escribe' ? 'escribe' : q.area === 'codigo' ? q.r.tipo : q.e.tipo, x = q.area === 'codigo' ? q.r : q.e;
+  if (q.area === 'escribe') await p.fill('#ex-hoja', bien ? q.tarea.sol[q.lang] : 'nada que ver');
+  else if (q.area === 'codigo' && t === 'completa') await p.fill('#ex-linea', bien ? x.lineaQuitada : 'zzz');
+  else if (q.area === 'codigo' && t === 'error') await p.locator('#v-examen .codigo li').nth(bien ? x.lineaMal : (x.lineaMal + 1) % x.codigoMal.replace(/\n+$/, '').split('\n').length).click();
   else if (q.area === 'codigo' && t === 'ordenar') {
     const lineas = x.codigo.split('\n').filter(l => l.trim() !== ''); if (!bien) lineas.reverse();
     for (const l of lineas) await p.evaluate(l => { const b = [...document.querySelectorAll('#v-examen .piezas .pieza')].find(y => y.textContent === l); if (b) b.click(); }, l);

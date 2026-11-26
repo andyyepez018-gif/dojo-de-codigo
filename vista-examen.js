@@ -7,9 +7,12 @@
 (function (raiz) {
 'use strict';
 raiz.VistaExamen = function (ctx) {
-  const { P, N, D, I, J, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista } = ctx;
+  const { P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista } = ctx;
   const { $, h, ls, NL, bloqueCodigo, salidaBloque } = U;
-  const st = { fase: 'intro', k: 0, preguntas: [], i: 0, resp: null, armado: [], res: null };
+  const LANGS = ['ps', 'py', 'cpp'];
+  const st = { fase: 'intro', k: 0, preguntas: [], i: 0, resp: null, armado: [], res: null, langEsc: ls.get('lang-escribir', null), proy: { paso: null, fallos: 0, res: null } };
+  const langEscribir = () => st.langEsc || (LANGS.includes(P.d.ajustes.lang) ? P.d.ajustes.lang : 'py');
+  const chipsLang = (valor, al, etq) => h('div', { class: 'chips', role: 'group', 'aria-label': etq }, ...LANGS.map(l => h('button', { class: 'chip', 'aria-pressed': String(valor === l), onclick: () => al(l) }, NL[l])));
   const EN_CURSO = 'examen-en-curso';
   // Solo para las pruebas automáticas: deja ver el examen en curso
   try { if (localStorage.getItem('dojo-pruebas') === '1') raiz.__examen = () => st; } catch (e) { /* sin almacenamiento */ }
@@ -23,6 +26,11 @@ raiz.VistaExamen = function (ctx) {
   }
 
   function generaPregunta(x) {
+    if (x.area === 'escribe') {
+      const tarea = W.porId[x.spec.tarea]; if (!tarea) return null;
+      const spec = Object.assign({}, x.spec, { lang: x.spec.lang || langEscribir() });
+      return { area: 'escribe', tarea, lang: spec.lang, spec };
+    }
     if (x.area === 'codigo') {
       let r = null;
       try { r = D.generar(x.spec); } catch (e) { r = null; }
@@ -35,7 +43,7 @@ raiz.VistaExamen = function (ctx) {
   }
   function empezar() {
     const ex = N.estadoExamen(P.d); if (!ex || !ex.disponible) { aviso('Este examen todavía no está disponible.'); return; }
-    const plan = N.planExamen(D, I, ex.rango, Math.floor(Math.random() * 2147483647), { sale: Voz.sale }, J);
+    const plan = N.planExamen(D, I, ex.rango, Math.floor(Math.random() * 2147483647), { sale: Voz.sale }, J, W);
     const preguntas = plan.map(generaPregunta).filter(Boolean);
     Object.assign(st, { fase: 'preguntas', k: ex.rango, preguntas, i: 0, resp: null, armado: [], res: null });
     ls.set(EN_CURSO, { rango: ex.rango, total: preguntas.length, inicio: Date.now(), plan: preguntas.map(q => ({ area: q.area, spec: q.spec })) });
@@ -47,8 +55,10 @@ raiz.VistaExamen = function (ctx) {
   /* ── Corregir (solo al final) ── */
   function esCorrecta(q) {
     const v = q.resp; if (v === null || v === undefined) return false;
+    if (q.area === 'escribe') return W.corrige(v, q.lang, q.tarea.pruebas, D).ok;
     if (q.area === 'codigo') {
       const r = q.r;
+      if (r.tipo === 'completa') return D.compruebaCompleta(r, v).ok;
       if (r.tipo === 'error') return v === r.lineaMal;
       if (r.tipo === 'ordenar') return D.compruebaOrden(r, v).ok;
       return v === r.correcta;
@@ -77,7 +87,7 @@ raiz.VistaExamen = function (ctx) {
   }
   /* Llamada por la app al cambiar de pantalla: salir a mitad es abandonar */
   function salir() {
-    if (st.fase === 'resultado' || st.fase === 'repaso') { st.fase = 'intro'; return; }
+    if (st.fase === 'resultado' || st.fase === 'repaso' || st.fase === 'proyecto') { st.fase = 'intro'; return; }
     if (st.fase !== 'preguntas') return;
     Voz.callar(); terminar(true);
     aviso('Saliste del examen: cuenta como suspendido y resta puntos. Repasa y vuelve a intentarlo.', 5500);
@@ -92,8 +102,23 @@ raiz.VistaExamen = function (ctx) {
     return g;
   }
   function entradas(r) { return r.entradas && r.entradas.length ? h('p', { class: 'fila' }, h('span', { class: 'tenue' }, 'El usuario escribe:'), ...r.entradas.map(e => h('span', { class: 'insignia ai mono' }, e))) : null; }
+  /* Escribir en el examen: una hoja en blanco (o una línea), sin colores, sin pistas */
+  function campoLinea(r) {
+    const c = h('input', { class: 'campo mono linea-escrita', id: 'ex-linea', type: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': `La línea ${r.linea + 1}, escrita por ti`, placeholder: `Línea ${r.linea + 1}`,
+      oninput: () => { st.resp = c.value.trim() ? c.value : null; const b = $('#ex-siguiente'); if (b) b.disabled = !st.resp; },
+      onkeydown: ev => { if (ev.key === 'Enter' && st.resp) { ev.preventDefault(); if (st.fase === 'repaso') corrigeRepaso(); else siguiente(); } } });
+    c.value = st.resp || ''; return c;
+  }
+  function cuerpoEscribe(q) {
+    const hoja = U.hojaPapel({ id: 'ex-hoja', etiqueta: `Tu programa en ${NL[q.lang]}`, valor: st.resp || '', filas: 9,
+      alCambiar: v => { st.resp = v.trim() ? v : null; const b = $('#ex-siguiente'); if (b) b.disabled = !st.resp; },
+      alComprobar: () => { if (st.resp) { if (st.fase === 'repaso') corrigeRepaso(); else siguiente(); } } });
+    return [h('h2', null, `Escríbelo en ${NL[q.lang]}`), h('p', { class: 'enunciado' }, q.tarea.enunciado),
+      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco: sin colores ni ayudas. Se comprobará con varios datos.' + (q.lang === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')), hoja];
+  }
   function cuerpoCodigo(r) {
     const l = r.lang;
+    if (r.tipo === 'completa') return [h('h2', null, 'Escribe la línea que falta'), h('p', { class: 'tenue' }, 'Para que muestre exactamente esto:'), salidaBloque(r.salida), entradas(r), bloqueCodigo(r.codigoConHueco, l), campoLinea(r)];
     if (r.tipo === 'salida') return [h('h2', null, '¿Qué muestra este programa?'), entradas(r), bloqueCodigo(r.codigo, l), opciones(r.opciones)];
     if (r.tipo === 'hueco') return [h('h2', null, '¿Qué va en el hueco?'), h('p', { class: 'tenue' }, 'Para que muestre exactamente esto:'), salidaBloque(r.salida), entradas(r), bloqueCodigo(r.codigo, l, { hueco: r.hueco, relleno: st.resp !== null ? r.opciones[st.resp] : null }), opciones(r.opciones)];
     if (r.tipo === 'traducir') return [h('h2', null, `¿Cuál es este programa en ${NL[l]}?`), h('span', { class: 'etiqueta' }, 'En ' + NL[r.origen]), bloqueCodigo(r.codigoOrigen, r.origen), entradas(r), opciones(r.opciones, true, l)];
@@ -140,10 +165,12 @@ raiz.VistaExamen = function (ctx) {
     if (e.tipo === 'profesional') return [h('h2', null, '¿Cómo lo dice un profesional?'), h('p', { class: 'situacion' }, e.situacion), opciones(e.opciones)];
     return [h('h2', null, 'Dilo en inglés profesional'), h('p', { class: 'situacion' }, e.situacion), h('p', { class: 'es-grande' }, '«' + e.es + '»'), opciones(e.opciones, false, null, ing)];
   }
-  const NOMBRE_AREA = { codigo: 'Código', ingles: 'Inglés', habla: 'Habla de programador' };
+  const NOMBRE_AREA = { codigo: 'Código', ingles: 'Inglés', habla: 'Habla de programador', escribe: 'Escribir código' };
+  const cuerpoDe = q => (q.area === 'escribe' ? cuerpoEscribe(q) : q.area === 'codigo' ? cuerpoCodigo(q.r) : q.area === 'habla' ? cuerpoHabla(q.e) : cuerpoIngles(q.e));
+  const insigniaLang = q => (q.area === 'codigo' ? h('span', { class: 'insignia ai' }, NL[q.r.lang]) : q.area === 'escribe' ? h('span', { class: 'insignia ai' }, NL[q.lang]) : null);
   function vistaPregunta() {
     const q = actual(), n = st.preguntas.length, R = N.RANGOS[st.k];
-    const partes = q.area === 'codigo' ? cuerpoCodigo(q.r) : q.area === 'habla' ? cuerpoHabla(q.e) : cuerpoIngles(q.e);
+    const partes = cuerpoDe(q);
     const ultima = st.i + 1 === n;
     return h('div', { class: 'columna' }, h('h1', { class: 'sr-only' }, 'Examen'),
       h('div', { class: 'tarjeta examen-cab' },
@@ -151,15 +178,17 @@ raiz.VistaExamen = function (ctx) {
         h('div', { class: 'barra', role: 'progressbar', 'aria-label': 'Avance del examen', 'aria-valuemin': '0', 'aria-valuemax': String(n), 'aria-valuenow': String(st.i) }, h('i', { style: `width:${Math.round(st.i / n * 100)}%` })),
         h('p', { class: 'tenue', style: 'font-size:13px' }, 'Sin ayuda: no verás si aciertas hasta el final. Si sales de esta pantalla, el examen cuenta como suspendido.')),
       h('article', { class: 'tarjeta reto pregunta' + (st.pintada !== q ? ' entra' : '') },
-        h('div', { class: 'reto-cab' }, h('span', { class: 'etiqueta' }, NOMBRE_AREA[q.area]), q.area === 'codigo' ? h('span', { class: 'insignia ai' }, NL[q.r.lang]) : null),
+        h('div', { class: 'reto-cab' }, h('span', { class: 'etiqueta' }, NOMBRE_AREA[q.area]), insigniaLang(q)),
         ...partes,
         h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'ex-siguiente', disabled: st.resp === null ? true : null, onclick: siguiente }, ultima ? 'Terminar y ver la nota' : 'Siguiente'))));
   }
 
   /* ── Resultado ── */
   function correctaTexto(q) {
+    if (q.area === 'escribe') return `Una solución en ${NL[q.lang]} (hay muchas formas correctas):\n${q.tarea.sol[q.lang]}`;
     if (q.area === 'codigo') {
       const r = q.r;
+      if (r.tipo === 'completa') return 'La línea era: ' + r.lineaQuitada;
       if (r.tipo === 'error') return `El error estaba en la línea ${r.lineaMal + 1}: ${r.explicaError}`;
       if (r.tipo === 'ordenar') return 'Un orden que funciona:\n' + r.codigo;
       if (r.tipo === 'traducir') return 'Era:\n' + r.opciones[r.correcta];
@@ -171,6 +200,7 @@ raiz.VistaExamen = function (ctx) {
     return 'Era: ' + e.opciones[e.correcta] + (e.en && e.tipo !== 'palabra' && e.tipo !== 'escucha' ? ` (${e.en})` : '');
   }
   function queEra(q) {
+    if (q.area === 'escribe') return `Escríbelo tú · ${NL[q.lang]} · ${D.temas.find(t => t.id === q.tarea.tema).titulo}`;
     if (q.area === 'codigo') return `${D.NOMBRE_TIPO[q.r.tipo]} · ${NL[q.r.lang]} · ${D.temas.find(t => t.id === q.r.tema).titulo}`;
     if (q.area === 'habla') return `${J.NOMBRE_TIPO[q.e.tipo]} · habla de programador, bloque ${J.porId[q.e.bloque].n}`;
     return `${I.NOMBRE_TIPO[q.e.tipo]} · inglés, unidad ${I.porId[q.e.unidad].n}`;
@@ -199,7 +229,14 @@ raiz.VistaExamen = function (ctx) {
     const ex = N.estadoExamen(P.d), rg = N.rangoActual(P.d);
     if (!ex) return h('div', { class: 'columna' }, h('section', { class: 'tarjeta' }, h('h1', null, 'No quedan exámenes'), h('p', null, 'Aprobaste los nueve. Eres Ingeniero de élite: mantén los puntos practicando.'), h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ir('hoy') }, 'Volver a Hoy'))));
     const temas = D.temas.slice(0, ex.temas), unidades = I.unidades.slice(0, ex.unidades), hist = P.d.examenes.historial.filter(x => x.rango === ex.rango);
+    const pr = W.proyectoDe(ex.rango), hechos = ex.proyecto;
+    const proyectoT = pr ? h('section', { class: 'tarjeta proyecto-tarjeta' + (ex.proyectoHecho ? ' hecho' : '') },
+      h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, 'Requisito: el proyecto del rango'), h('span', { class: 'insignia ' + (ex.proyectoHecho ? 'bien' : 'kihada') }, ex.proyectoHecho ? 'Terminado' : `${hechos} de ${N.PASOS_PROYECTO} pasos`)),
+      h('h2', null, pr.titulo), h('p', { class: 'tenue' }, pr.idea + ' Se escribe a mano, paso a paso, como en papel; cada paso se comprueba con pruebas.'),
+      h('ol', { class: 'pasos-proyecto' }, ...pr.pasos.map((x, k) => h('li', { class: k < hechos ? 'hecho' : k === hechos ? 'actual' : '' }, x.enunciado.split('\n')[0]))),
+      h('div', { class: 'fila' }, h('button', { class: 'btn ' + (ex.proyectoHecho ? '' : 'primario'), id: 'ex-proyecto', onclick: abreProyecto }, ex.proyectoHecho ? 'Volver a escribirlo' : hechos ? 'Seguir el proyecto' : 'Empezar el proyecto'))) : null;
     const estado = ex.disponible ? h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', id: 'ex-empezar', onclick: empezar }, 'Empezar el examen'), h('button', { class: 'btn', onclick: () => ir('hoy') }, 'Ahora no'))
+      : !ex.proyectoHecho && !ex.repaso && rg.i === P.d.rangoMax ? h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Antes del examen, termina el proyecto «${pr ? pr.titulo : ''}» (abajo).${ex.espera ? ` Y te faltan ${U.miles(ex.espera)} puntos.` : ''}`)
       : rg.i < P.d.rangoMax ? h('p', { class: 'insignia mal', style: 'white-space:normal' }, `Primero recupera tu rango: te faltan ${U.miles(N.RANGOS[P.d.rangoMax].min - P.d.puntos)} puntos.`)
       : ex.repaso ? h('div', { class: 'pila' }, h('p', { class: 'insignia mal', style: 'white-space:normal' }, `Suspendiste: primero repasa las ${ex.repaso} ${ex.repaso === 1 ? 'pregunta que fallaste' : 'preguntas que fallaste'}${ex.espera ? ` y recupera ${U.miles(ex.espera)} puntos` : ''}.`), h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'ex-repasar', onclick: empiezaRepaso }, 'Repasar lo que fallé')))
       : ex.espera && ex.objetivo > ex.min ? h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Repaso hecho. Vuelve a tus ${U.miles(ex.objetivo)} puntos para repetirlo: te faltan ${U.miles(ex.espera)}.`)
@@ -208,12 +245,15 @@ raiz.VistaExamen = function (ctx) {
       h('section', { class: 'tarjeta examen-intro' },
         h('div', { class: 'cabeza-rango' }, U.emblema(ex.rango, 58, ex.nombre), h('div', { class: 'pila', style: 'gap:2px' }, h('span', { class: 'etiqueta' }, `Examen de ascenso · rango ${ex.rango + 1} de ${N.RANGOS.length}`), h('h1', null, ex.nombre), h('span', { class: 'tenue' }, N.RANGOS[ex.rango].lema))),
         h('ul', { class: 'lista' },
-          h('li', null, h('b', null, `${ex.preguntas} preguntas`), ` mezcladas: código (PSeInt, Python y C++), inglés y habla de programador.`),
+          h('li', null, h('b', null, `${ex.preguntas} preguntas`), ` mezcladas: código (leer y escribir, en PSeInt, Python y C++), inglés y habla de programador.`),
+          h('li', null, h('b', null, 'Escribir de verdad: '), `${ex.rango <= 2 ? 'un programa' : 'dos programas'} desde cero y alguna línea que falta, sin colores ni ayudas, como en papel.`),
           h('li', null, h('b', null, `Para aprobar: el ${Math.round(ex.nota * 100)} %`), ` (${Math.ceil(ex.preguntas * ex.nota)} bien como mínimo).`),
           h('li', null, h('b', null, 'Sin ninguna ayuda: '), 'ni tutor, ni pistas, ni pronunciación escrita, ni paso a paso. No sabrás si aciertas hasta el final.'),
           h('li', null, h('b', null, 'Sin salir: '), 'si cambias de pantalla o cierras la app, cuenta como suspendido.'),
           h('li', null, h('b', null, `Si suspendes, pierdes ${U.miles(ex.multa)} puntos`), ', repasas lo que fallaste y, cuando recuperes los puntos, lo repites. Aprobar da +' + N.PUNTOS.examen + ' puntos.')),
+        h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Lenguaje en el que escribirás'), chipsLang(langEscribir(), l => { st.langEsc = l; ls.set('lang-escribir', l); pinta(); }, 'Lenguaje para escribir en el examen')),
         estado),
+      proyectoT,
       h('section', { class: 'tarjeta' }, h('h2', null, `Lo que debe saber un ${ex.nombre}`), h('ul', { class: 'lista sabe' }, ...ex.sabe.map(x => h('li', null, x)))),
       h('section', { class: 'tarjeta' }, h('h2', null, 'Lo que entra'),
         h('div', { class: 'tres-col' },
@@ -221,6 +261,42 @@ raiz.VistaExamen = function (ctx) {
           h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, `Inglés · unidades 1 a ${ex.unidades}`), h('ol', { class: 'lista' }, ...unidades.map(u => h('li', null, u.titulo)))),
           h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, `Habla · bloques 1 a ${ex.bloques}`), h('ol', { class: 'lista' }, ...J.bloques.slice(0, ex.bloques).map(b => h('li', null, b.titulo)))))),
       hist.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Tus intentos'), h('ul', { class: 'lista' }, ...hist.slice(-5).reverse().map(x => h('li', { class: 'num' }, `${x.dia}: ${x.abandonado ? 'abandonado' : `${x.bien} de ${x.total} (${Math.round(x.bien / x.total * 100)} %)`} · ${x.aprobado ? 'aprobado' : 'suspendido'}`)))) : null);
+  }
+
+  /* ── El proyecto guiado del rango: tres pasos escritos a mano; requisito para el examen ── */
+  const claveCodigo = (k, l) => `proyecto-${k}-${l}`;
+  function abreProyecto() { const ex = N.estadoExamen(P.d); if (!ex) return; st.fase = 'proyecto'; st.k = ex.rango; st.proy = { paso: Math.min(ex.proyecto, N.PASOS_PROYECTO - 1), fallos: 0, res: null }; if (vista() !== 'examen') ir('examen'); else { pinta(); window.scrollTo(0, 0); } }
+  function compruebaPaso() {
+    const pr = W.proyectoDe(st.k), x = st.proy, l = langEscribir(), codigo = ls.get(claveCodigo(st.k, l), '') || '';
+    if (!codigo.trim()) { aviso('Escribe tu programa primero.'); return; }
+    const c = W.corrige(codigo, l, pr.pasos[x.paso].pruebas, D);
+    const r = N.registraPaso(P.d, st.k, x.paso, c.ok);
+    x.res = Object.assign(c, { reg: r }); if (!c.ok) x.fallos++;
+    // primero se celebra el proyecto; el aviso de «examen disponible» espera su turno detrás
+    if (r.terminado && c.ok) U.celebra(0, `+${N.PUNTOS.paso + N.PUNTOS.proyecto} puntos. Lo escribiste tú, paso a paso.${N.estadoExamen(P.d).disponible ? ' Ya puedes hacer el examen.' : ''}`, { figura: h('span', { class: 'sello-en grande', 'aria-hidden': 'true' }, '{ }'), etiqueta: 'Proyecto terminado', titulo: pr.titulo });
+    trataPuntos(r, c.ok);
+    pinta();
+  }
+  function vistaProyecto() {
+    const pr = W.proyectoDe(st.k), x = st.proy, hechos = P.d.proyectos[st.k] || 0, paso = pr.pasos[x.paso], l = langEscribir(), res = x.res;
+    return h('div', { class: 'columna' }, h('h1', { class: 'sr-only' }, 'Proyecto'),
+      h('div', null, h('button', { class: 'btn plano', onclick: () => { st.fase = 'intro'; pinta(); } }, '← Volver al examen')),
+      h('section', { class: 'tarjeta' },
+        h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, `Proyecto para «${N.RANGOS[st.k].n}»`), h('span', { class: 'insignia num' }, `Paso ${x.paso + 1} de ${N.PASOS_PROYECTO}`)),
+        h('h2', null, pr.titulo), h('p', { class: 'tenue' }, pr.idea),
+        h('ol', { class: 'pasos-proyecto' }, ...pr.pasos.map((p, k) => h('li', { class: k < hechos ? 'hecho' : k === x.paso ? 'actual' : '' }, k <= hechos ? h('button', { class: 'btn plano chico', onclick: () => { st.proy = { paso: k, fallos: 0, res: null }; pinta(); } }, p.enunciado.split('\n')[0]) : p.enunciado.split('\n')[0])))),
+      h('article', { class: 'tarjeta reto' },
+        h('h2', null, `Paso ${x.paso + 1}`), h('p', { class: 'enunciado' }, paso.enunciado),
+        h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Lenguaje'), chipsLang(l, nl => { st.langEsc = nl; ls.set('lang-escribir', nl); x.res = null; pinta(); }, 'Lenguaje del proyecto')),
+        h('p', { class: 'tenue', style: 'font-size:13px' }, 'Escríbelo aquí como en papel (o primero en papel de verdad, y luego pásalo). Lo que escribes se guarda: cada paso sigue al anterior.' + (l === 'cpp' ? ' En C++ basta con lo de dentro de main (y las funciones arriba).' : '')),
+        U.hojaPapel({ id: 'proyecto-hoja', etiqueta: `Tu proyecto en ${NL[l]}`, filas: 14, valor: ls.get(claveCodigo(st.k, l), '') || '', alCambiar: v => ls.set(claveCodigo(st.k, l), v), alComprobar: compruebaPaso }),
+        h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'proy-comprobar', onclick: compruebaPaso }, 'Comprobar este paso'), h('span', { class: 'atajos' }, 'Tab pone 4 espacios · Ctrl+Enter comprueba')),
+        res ? h('div', { class: 'respuesta ' + (res.ok ? 'si' : 'no'), role: 'status' },
+          h('div', { class: 'entre' }, h('h3', null, res.ok ? (res.reg.terminado ? '¡Proyecto terminado!' : `Paso ${x.paso + 1} hecho`) : 'Todavía no'), chipPuntos(res.reg)),
+          U.listaPruebas(res.resultados),
+          !res.ok && x.fallos >= 2 ? h('details', { class: 'desplegable' }, h('summary', null, 'Ver una solución (después de dos intentos)'), U.bloqueCodigo(paso.sol[l], l), h('p', { class: 'tenue', style: 'font-size:13px' }, 'Léela, ciérrala y escríbela tú sin mirar.')) : null,
+          res.ok && x.paso + 1 < N.PASOS_PROYECTO ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => { st.proy = { paso: x.paso + 1, fallos: 0, res: null }; pinta(); window.scrollTo(0, 0); } }, `Paso ${x.paso + 2}`)) : null,
+          res.ok && res.reg.terminado ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => { st.fase = 'intro'; pinta(); window.scrollTo(0, 0); } }, 'Volver al examen')) : null) : null));
   }
 
   /* ── El repaso obligatorio de lo fallado: con corrección y explicación en cada pregunta ── */
@@ -236,13 +312,13 @@ raiz.VistaExamen = function (ctx) {
   }
   function vistaRepaso() {
     const q = actual(), quedan = P.d.examenes.repaso.length + (st.corregida && q.ok ? 1 : 0), ex = N.estadoExamen(P.d);
-    const partes = q.area === 'codigo' ? cuerpoCodigo(q.r) : q.area === 'habla' ? cuerpoHabla(q.e) : cuerpoIngles(q.e);
+    const partes = cuerpoDe(q);
     const c = st.corregida;
     return h('div', { class: 'columna' }, h('h1', { class: 'sr-only' }, 'Repaso del examen'),
       h('div', { class: 'tarjeta examen-cab' }, h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, `Repaso del examen de «${ex ? ex.nombre : ''}»`), h('span', { class: 'insignia num' }, `Quedan ${quedan}`)),
         h('p', { class: 'tenue', style: 'font-size:13px' }, 'Lo que fallaste en el examen. Aquí sí ves la respuesta: acierta cada una para quitarla. Fallar resta puntos.')),
       h('article', { class: 'tarjeta reto pregunta' + (st.pintada !== q ? ' entra' : '') },
-        h('div', { class: 'reto-cab' }, h('span', { class: 'etiqueta' }, NOMBRE_AREA[q.area]), q.area === 'codigo' ? h('span', { class: 'insignia ai' }, NL[q.r.lang]) : null),
+        h('div', { class: 'reto-cab' }, h('span', { class: 'etiqueta' }, NOMBRE_AREA[q.area]), insigniaLang(q)),
         ...(c ? [h('div', { class: 'tapa-pregunta', inert: true }, ...partes)] : partes),
         c ? h('div', { class: 'respuesta ' + (q.ok ? 'si' : 'no'), role: 'status' }, h('div', { class: 'entre' }, h('h3', null, q.ok ? 'Correcto: quitada del repaso' : 'No era esa: se queda en el repaso'), chipPuntos(c)),
             h('p', { style: 'white-space:pre-wrap' }, correctaTexto(q)), q.area === 'codigo' && q.r.explica ? h('p', { class: 'tenue' }, q.r.explica) : null,
@@ -257,6 +333,7 @@ raiz.VistaExamen = function (ctx) {
     if (st.fase === 'preguntas' && actual()) { el.append(vistaPregunta()); st.pintada = actual(); }
     else if (st.fase === 'resultado' && st.res) el.append(vistaResultado());
     else if (st.fase === 'repaso' && actual()) { el.append(vistaRepaso()); st.pintada = actual(); }
+    else if (st.fase === 'proyecto' && W.proyectoDe(st.k)) el.append(vistaProyecto());
     else { st.fase = 'intro'; el.append(vistaIntro()); }
     if (foco && document.getElementById(foco) && el.contains(document.getElementById(foco))) document.getElementById(foco).focus({ preventScroll: true });
   }
@@ -264,11 +341,11 @@ raiz.VistaExamen = function (ctx) {
   document.addEventListener('keydown', ev => {
     if (vista() !== 'examen' || (st.fase !== 'preguntas' && !(st.fase === 'repaso' && !st.corregida)) || ev.ctrlKey || ev.metaKey || ev.altKey || document.querySelector('.capa')) return;
     if (ev.target.closest && ev.target.closest('input, textarea, select')) return;
-    const q = actual(); if (!q) return; const ops = q.area === 'codigo' ? (q.r.tipo !== 'error' && q.r.tipo !== 'ordenar' ? q.r.opciones : null) : q.e.opciones;
+    const q = actual(); if (!q || q.area === 'escribe') return; const ops = q.area === 'codigo' ? (!['error', 'ordenar', 'completa'].includes(q.r.tipo) ? q.r.opciones : null) : q.e.opciones;
     if (ops && /^[1-4]$/.test(ev.key) && +ev.key <= ops.length) { ev.preventDefault(); st.resp = +ev.key - 1; pinta(); }
     else if (ev.key === 'Enter' && st.resp !== null && !(ev.target.closest && ev.target.closest('button'))) { ev.preventDefault(); if (st.fase === 'repaso') corrigeRepaso(); else siguiente(); }
   });
 
-  return { pinta, salir, revisaAbandono, empiezaRepaso, enCurso: () => st.fase === 'preguntas', estado: st };
+  return { pinta, salir, revisaAbandono, empiezaRepaso, abreProyecto, enCurso: () => st.fase === 'preguntas', estado: st };
 };
 })(window);

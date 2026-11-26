@@ -19,6 +19,8 @@ async function nueva(b, opts = {}, progreso, antes) {
   return { c, p };
 }
 async function responderReto(p) {
+  if (await p.locator('#linea-escrita:not([disabled])').count()) { await p.fill('#linea-escrita', 'x'); await p.keyboard.press('Enter'); return 'línea escrita'; }
+  if (await p.locator('#hoja-escribe:not([disabled])').count()) { await p.fill('#hoja-escribe', 'x'); await p.locator('#v-retos').getByRole('button', { name: 'Comprobar' }).click(); return 'programa escrito'; }
   if (await p.locator('.opcion:not([disabled])').count()) { await p.locator('.opcion:not([disabled])').first().click(); return 'opción'; }
   const n = await p.locator('.codigo li.toca').count(); if (n) { await p.locator('.codigo li.toca').nth(Math.min(1, n - 1)).click(); return 'línea'; }
   if (await p.locator('.piezas .pieza').count()) { while (await p.locator('.piezas .pieza').count()) await p.locator('.piezas .pieza').first().click(); await p.getByRole('button', { name: 'Comprobar' }).click(); return 'orden'; }
@@ -183,11 +185,11 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await c.close();
 
   console.log('11. Inglés: práctica con voz, micrófono, puntos y subir de rango');
-  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 280 }, vozFalsa));
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 280, proyectos: { 1: 3 } }, vozFalsa));
   await p.goto(URL + '#ingles'); await p.waitForSelector('.portada-en');
   ok('la pestaña Inglés está en el menú', await p.locator('#menu-lateral a[href="#ingles"]').count() === 1);
   ok('dice qué voz y micrófono hay', /voz del dispositivo/.test(await p.textContent('.estado-voz')) && /micrófono del dispositivo/.test(await p.textContent('.estado-voz')));
-  ok('las 12 unidades, en tres niveles', await p.locator('#v-ingles .temas .tema').count() === 12 && /A1 · Principiante/.test(await p.textContent('#v-ingles')) && /B1 · Intermedio/.test(await p.textContent('#v-ingles')));
+  ok('las 14 unidades, en cuatro niveles', await p.locator('#v-ingles .temas .tema').count() === CURSO.unidades.length && /A1 · Principiante/.test(await p.textContent('#v-ingles')) && /B2 · Intermedio alto/.test(await p.textContent('#v-ingles')));
   await p.screenshot({ path: path.join(CAPTURAS, '11-ingles.png') });
   await p.locator('#v-ingles').getByRole('button', { name: 'Practicar', exact: true }).click(); await p.waitForSelector('#v-ingles .ejercicio');
   const tiposIngles = new Set(); let puntosAntes = 280, sumaOk = true, fiesta = false;
@@ -277,7 +279,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
 
   console.log('13. Examen de ascenso: aprobar, suspender y abandonar');
   const modoPruebas = () => { localStorage.setItem('dojo-pruebas', '1'); };
-  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 1100, examenes: {} }, modoPruebas));
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 1100, examenes: {}, proyectos: { 1: 3, 2: 3 } }, modoPruebas));
   await p.goto(URL + '#hoy'); await p.waitForSelector('.rango-tarjeta');
   ok('con los puntos pero sin examen sigues en Aprendiz', /Aprendiz/.test(await p.textContent('#rango-lateral')) && /Examen para «Estudiante de código»/.test(await p.textContent('.siguiente')));
   await p.locator('.rango-tarjeta').getByRole('button', { name: /Hacer el examen/ }).click(); await p.waitForSelector('#ex-empezar');
@@ -320,13 +322,13 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   ok('repaso hecho: ahora hay que volver a los puntos de antes', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).examenes.repaso.length === 0) && /Vuelve a tus 1250 puntos/.test(await p.textContent('#v-examen')) && await p.locator('#ex-empezar').count() === 0, await p.textContent('#v-examen'));
   await c.close();
   // abandonar: cambiar de pantalla o recargar a mitad cuenta como suspenso
-  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {} }, modoPruebas));
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {}, proyectos: { 1: 3 } }, modoPruebas));
   await p.goto(URL + '#examen'); await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
   await resuelveExamen(p, true); await p.locator('#menu-lateral a[href="#retos"]').click(); await pausa(300);
   ok('salir a mitad: suspendido, resta puntos y lo avisa', /cuenta como suspendido/.test(await p.textContent('#aviso')) && /Aprendiz/.test(await p.textContent('#rango-lateral')) && /350 puntos/.test(await p.textContent('#rango-lateral')));
   ok('el intento abandonado queda en el historial', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).examenes.historial.at(-1).abandonado === true));
   await c.close();
-  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {} }, modoPruebas));
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {}, proyectos: { 1: 3 } }, modoPruebas));
   await p.goto(URL + '#examen'); await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
   await p.reload(); await p.waitForSelector('.portada, .examen-intro, .rango-tarjeta').catch(() => {}); await pausa(400);
   ok('recargar a mitad también cuenta como suspenso', await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('dojo-progreso')); return d.examenes.historial.length === 1 && d.examenes.historial[0].abandonado && d.rangoMax === 0 && d.puntos === 350 && d.examenes.repaso.length === 12; }));
@@ -335,7 +337,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   console.log('14. Habla de programador y fallos que restan');
   ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 500, examenes: {} }));
   await p.goto(URL + '#habla'); await p.waitForSelector('.portada-habla');
-  ok('la pestaña Habla muestra los 6 bloques', await p.locator('#v-habla .tema').count() === 6 && await p.locator('#menu-lateral a[href="#habla"]').count() === 1);
+  ok('la pestaña Habla muestra los 8 bloques', await p.locator('#v-habla .tema').count() === require('../habla.js').bloques.length && await p.locator('#menu-lateral a[href="#habla"]').count() === 1);
   await p.locator('#v-habla .tema').first().click();
   ok('el bloque enseña términos en español e inglés y la forma profesional', /variable/.test(await p.textContent('#v-habla .glosario')) && /return value/.test(await p.textContent('#v-habla .glosario')) && await p.locator('#v-habla .bien-dicho').count() === 4 && await p.locator('#v-habla .mal-dicho').count() === 4);
   await p.screenshot({ path: path.join(CAPTURAS, '22-habla-bloque.png'), fullPage: true });
@@ -355,6 +357,58 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   if (!(await botonComprobar.count())) { await p.goto(URL + '#ruta'); await p.locator('.tema').first().click(); await p.getByRole('button', { name: /Resolver/ }).first().click(); await p.waitForSelector('#editor-codigo'); }
   await p.fill('#editor-codigo', 'Escribir "mal"'); await p.getByRole('button', { name: /Comprobar/ }).click(); await pausa(800);
   ok('un ejercicio del laboratorio que no pasa resta 5 puntos', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).puntos) === antesLab - 5);
+  await c.close();
+
+  console.log('15. Escribir código: completar líneas, escribir desde cero y el proyecto del rango');
+  const W = require('../escribir.js');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 320, examenes: {}, ajustes: { lang: 'py' },
+    temas: { salida: { ultimos: [1, 1, 1, 1, 1, 1, 1, 1], intentos: 8, aciertos: 8 } } }, modoPruebas));
+  await p.goto(URL + '#retos'); await p.waitForSelector('.reto');
+  // forzar los dos tipos de escritura: se busca hasta que salgan (en el tema 1 dominado salen a menudo)
+  let vioCompleta = false, vioEscribe = false;
+  for (let k = 0; k < 60 && !(vioCompleta && vioEscribe); k++) {
+    const tipo = (await p.textContent('.reto-cab .etiqueta')).trim();
+    if (tipo === 'Escribe la línea que falta' && !vioCompleta) {
+      const linea = await p.evaluate(() => null);
+      await p.fill('#linea-escrita', 'print(zzz)'); await p.keyboard.press('Enter'); await p.waitForSelector('.respuesta');
+      ok('completar mal: lo corrige ejecutándolo y resta', /−5 puntos/.test(await p.textContent('.respuesta')) && /La línea era/.test(await p.textContent('.respuesta')));
+      vioCompleta = true; await p.screenshot({ path: path.join(CAPTURAS, '24-completa.png') });
+    } else if (tipo === 'Escríbelo tú' && !vioEscribe) {
+      const enun = (await p.textContent('.reto .enunciado')).trim(), tarea = W.tareas.find(t => t.enunciado === enun);
+      await p.fill('#hoja-escribe', tarea.sol.py); await p.locator('#v-retos').getByRole('button', { name: 'Comprobar' }).click(); await p.waitForSelector('.respuesta');
+      ok('escribir desde cero: la solución pasa todas las pruebas y suma 15', /Funciona: lo escribiste tú/.test(await p.textContent('.respuesta')) && /\+1[5-9] puntos|\+20 puntos/.test(await p.textContent('.respuesta')), await p.textContent('.respuesta'));
+      vioEscribe = true; await p.screenshot({ path: path.join(CAPTURAS, '25-escribe.png'), fullPage: true });
+    } else { await responderReto(p); await p.waitForSelector('.respuesta').catch(() => {}); }
+    await cierraFiesta(p); await p.click('#siguiente'); await p.waitForSelector('.reto');
+  }
+  ok('en Retos salen los dos tipos de escritura', vioCompleta && vioEscribe, [vioCompleta, vioEscribe]);
+  // el proyecto del rango: requisito para el examen
+  await p.goto(URL + '#hoy'); await p.waitForSelector('.siguiente');
+  ok('con los puntos pero sin proyecto, Hoy pide terminar el proyecto', /Termina tu proyecto/.test(await p.textContent('.siguiente')));
+  await p.locator('.siguiente').getByRole('button', { name: 'Seguir el proyecto' }).click(); await p.waitForSelector('#proyecto-hoja');
+  const proy = W.proyectoDe(1);
+  await p.fill('#proyecto-hoja', 'print("hola")'); await p.click('#proy-comprobar'); await p.waitForSelector('#v-examen .respuesta');
+  ok('un paso mal resta y enseña las pruebas', /Todavía no/.test(await p.textContent('#v-examen .respuesta')) && /−5 puntos/.test(await p.textContent('#v-examen .respuesta')));
+  for (let k = 0; k < 3; k++) {
+    await p.fill('#proyecto-hoja', proy.pasos[k].sol.py); await p.click('#proy-comprobar'); await p.waitForSelector('#v-examen .respuesta.si');
+    if (k < 2) { await p.getByRole('button', { name: `Paso ${k + 2}` }).click(); await p.waitForSelector('#proyecto-hoja'); }
+  }
+  ok('terminar el proyecto lo celebra', await p.locator('.capa').count() === 1 && /Proyecto terminado/.test(await p.textContent('.capa')));
+  await p.screenshot({ path: path.join(CAPTURAS, '26-proyecto.png'), fullPage: true }); await cierraFiesta(p);
+  ok('lo escrito se guarda (cada paso sigue al anterior)', (await p.inputValue('#proyecto-hoja')).includes('Siguiente nivel'));
+  await p.getByRole('button', { name: 'Volver al examen' }).first().click(); await p.waitForSelector('#ex-empezar');
+  ok('con el proyecto terminado, el examen se abre', await p.locator('#ex-empezar').count() === 1 && /Terminado/.test(await p.textContent('.proyecto-tarjeta')));
+  await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
+  const vistosEsc = new Set();
+  for (let k = 0; k < 12; k++) vistosEsc.add(await resuelveExamen(p, true));
+  await p.waitForSelector('.resultado-examen');
+  ok('el examen pide escribir código (y el robot lo escribe bien)', vistosEsc.has('escribe:escribe') && /Aprobado/.test(await p.textContent('.resultado-examen')), [...vistosEsc]);
+  await cierraFiesta(p);
+  // recordatorio diario
+  await p.goto(URL + '#plan'); await p.waitForSelector('#recordatorio');
+  const [descarga] = await Promise.all([p.waitForEvent('download'), p.getByRole('button', { name: 'Añadir al calendario' }).click()]);
+  const ics = fs.readFileSync(await descarga.path(), 'utf8');
+  ok('el recordatorio es un evento diario con aviso', /BEGIN:VCALENDAR/.test(ics) && /RRULE:FREQ=DAILY/.test(ics) && /BEGIN:VALARM/.test(ics) && /T180000/.test(ics), ics.slice(0, 200));
   await c.close();
 
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');

@@ -20,15 +20,23 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 - **Laboratorio:** editor con colores, ejecución en un hilo aparte (la pantalla nunca se congela y
   se puede detener), consola que pide datos, avisos de fallos típicos y **paso a paso** con las
   variables, la función en curso y la salida de cada momento. Rama extra de HTML con vista previa.
+- **Escribir código, no solo reconocerlo:** «Escribe la línea que falta» (sin opciones) y «Escríbelo tú»
+  (20 tareas, 2 por tema, en una hoja en blanco sin colores ni ayudas, como en papel o en el bloc de
+  notas; se corrige ejecutándolo con varios datos, así que copiar la salida no vale). Al empezar un tema
+  solo se lee; luego una cuarta parte de los retos son de escribir y, al dominarlo, el 40 %.
+- **Proyecto guiado por rango:** 9 proyectos (de la ficha de programador al analizador de texto), en 3
+  pasos que se construyen uno sobre otro; hay que terminarlo para poder hacer el examen del rango.
+- **Recordatorio diario:** un evento del calendario que suena cada día a tu hora (archivo .ics), y el
+  número de pendientes sobre el icono de la app instalada.
 - **Exámenes de ascenso:** cada rango dice qué debe saber quien lo tiene (código, inglés y habla) y su
   examen lo evalúa: de 12 a 36 preguntas mezcladas, sin tutor ni pistas, sin saber si aciertas hasta el
   final, con nota mínima del 70 % al 85 %. Llegar a los puntos solo abre el examen; subir exige aprobarlo.
   Salir a mitad o cerrar la app cuenta como suspenso. Suspender resta el 10 % de los puntos del rango y
   deja un repaso obligatorio de lo fallado (con explicaciones); terminado el repaso y recuperados los
   puntos de antes, se puede repetir.
-- **Habla de programador:** seis bloques (lo básico del código, errores y depuración, Git y revisiones,
-  calidad, producto y equipo, sistemas en producción) con 48 términos en español e inglés y 24
-  situaciones de trabajo: lo que no se dice y cómo lo dice un profesional, en los dos idiomas.
+- **Habla de programador:** ocho bloques (lo básico del código, errores y depuración, Git y revisiones,
+  calidad, producto y equipo, sistemas en producción, diseño y arquitectura, entrevistas y carrera) con
+  64 términos en español e inglés y 32 situaciones de trabajo: lo que no se dice y cómo lo dice un profesional, en los dos idiomas.
 - **Rangos y puntos:** diez rangos (Aprendiz, Estudiante de código, Pasante, Programador junior,
   Programador, Programador senior, Ingeniero de software, Ingeniero senior, Arquitecto de software e
   Ingeniero de élite, a partir de 30.000 puntos). Acertar suma (más en racha) y fallar resta: un reto de
@@ -36,7 +44,7 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
   frase mal dicha o una respuesta no entendida en una conversación −2. Si los puntos bajan del mínimo de
   tu rango, bajas de rango. Todos los valores están en `PUNTOS` y `RANGOS` (`nucleo.js`) y la app los
   muestra desde ahí.
-- **Inglés para programar:** 12 unidades del A1 al B1 técnico (saludar, leer código en voz alta, el
+- **Inglés para programar:** 14 unidades del A1 al B2 técnico (saludar, leer código en voz alta, el
   teclado, las palabras del código, verbos, explicar código, mensajes de error reales, pedir ayuda,
   commits en pasado, planes, la reunión diaria y documentación): 144 palabras con su pronunciación,
   72 frases, gramática mínima y una conversación guiada por unidad. Nueve clases de ejercicio
@@ -57,6 +65,7 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 | `ingles.js` | El curso de inglés: 12 unidades, mensajes de error, comparadores tolerantes (mayúsculas, signos, contracciones, números) y el generador de ejercicios. |
 | `nucleo.js` | Lógica sin pantalla: progreso (con validación y migración), puntos y rangos, repaso espaciado, inglés, racha, recomendaciones. |
 | `ui.js` | Piezas visuales: resaltado, editor con colores, cinturones, insignias de rango, celebración, aspecto claro/oscuro. |
+| `escribir.js` | Las tareas de escribir y los proyectos de cada rango, con pruebas y soluciones en los tres lenguajes. |
 | `habla.js` | Habla de programador: los 6 bloques de términos y situaciones y su generador de ejercicios. |
 | `vista-habla.js`, `vista-examen.js` | Las pantallas de Habla y del examen de ascenso (con su repaso). |
 | `voz.js` | Oír y hablar inglés: voz y dictado de Claude o del navegador, con respaldo sin voz. |
@@ -77,6 +86,7 @@ node pruebas/motor.test.js        # 119 programas y errores típicos en los tres
 node pruebas/contenido.test.js    # miles de retos generados y comprobados con el motor
 node pruebas/soluciones.test.js   # los 20 ejercicios resueltos en los tres lenguajes
 node pruebas/ingles.test.js       # el curso de inglés: contenido, comparadores y miles de ejercicios
+node pruebas/escribir.test.js     # cada tarea y cada paso de proyecto, resueltos y comprobados en los tres lenguajes
 node pruebas/habla.test.js        # habla de programador: términos, situaciones y ejercicios
 node pruebas/nucleo.test.js       # progreso, migración, rangos y exámenes, repaso espaciado, inglés y habla
 # en un navegador (Playwright): sirve docs/ en el puerto 8770 y

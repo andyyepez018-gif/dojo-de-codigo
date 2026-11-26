@@ -2,7 +2,7 @@
    No toca el DOM, así que se prueba igual en Node que en el navegador. */
 (function (raiz) {
 'use strict';
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const LANGS = ['ps', 'py', 'cpp'];
 const REGLA = 'Si le mando un mensaje a Claude, entonces abro el Dojo y hago retos hasta que me responda.';
 const INTERVALOS = [0, 1, 3, 7, 16, 35];   // días hasta el siguiente repaso según la caja (0 = fallado)
@@ -32,16 +32,18 @@ const RANGOS = [
     sabe: ['Usar arreglos y listas: recorrerlos, buscar, sumar, el mayor y el menor.', 'Pedir ayuda y contar lo que hiciste en inglés (pasado y commits).', 'Hablar de calidad: pruebas unitarias, refactorizar, deuda técnica, legibilidad y rendimiento.'] },
   { n: 'Arquitecto de software', min: 22000, lema: 'Dominas la base y podrías enseñársela a otros.', examen: { temas: 9, unidades: 10, bloques: 5, preguntas: 28, nota: 0.8 },
     sabe: ['Diseñar funciones con parámetros y valor de retorno.', 'Hablar de planes en inglés (will y going to).', 'Estimar, negociar plazos y avisar de bloqueos como un profesional.'] },
-  { n: 'Ingeniero de élite', min: 30000, lema: 'La cima del Dojo. Pocos llegan hasta aquí.', examen: { temas: 10, unidades: 12, bloques: 6, preguntas: 36, nota: 0.85 },
-    sabe: ['Trabajar con texto (recorrer, contar, cortar y transformar cadenas) y todo lo anterior junto, sin ayuda.', 'Participar en una reunión en inglés y leer documentación técnica.', 'Hablar de sistemas en producción: desplegar, revertir, incidentes, y explicarlo a alguien que no programa.'] }
+  { n: 'Ingeniero de élite', min: 30000, lema: 'La cima del Dojo. Pocos llegan hasta aquí.', examen: { temas: 10, unidades: 14, bloques: 8, preguntas: 36, nota: 0.85 },
+    sabe: ['Trabajar con texto (recorrer, contar, cortar y transformar cadenas) y todo lo anterior junto, sin ayuda.', 'Participar en una reunión y una revisión de código en inglés, leer documentación y pasar una entrevista técnica.', 'Hablar de producción y de diseño (desplegar, revertir, incidentes, cuellos de botella, compromisos) y defenderte en una entrevista, en español y en inglés.'] }
 ];
 /* Cuánto vale cada cosa. La racha de aciertos (combo) suma +1 por acierto seguido, hasta +5. */
 const PUNTOS = {
   reto: 10, retoFallo: -5, comboMax: 5, meta: 50, cinturon: 100, ejercicio: 50, html: 30, focoMin: 2,
   ingles: 8, inglesFallo: -4, habla: 12, hablaCasi: 3, hablaFallo: -2, metaIngles: 30, conversa: 40, conversaOtra: 15, unidad: 100,
   examen: 150, repasoBien: 5, repasoFallo: -5,   // aprobar un examen da +150; suspender resta (ver multaExamen)
-  ejercicioFallo: -5, conversaFallo: -2, jerga: 8, jergaFallo: -4   // también restan el laboratorio, las conversaciones y la jerga
+  ejercicioFallo: -5, conversaFallo: -2, jerga: 8, jergaFallo: -4,   // también restan el laboratorio, las conversaciones y la jerga
+  completa: 12, escribe: 15, paso: 40, proyecto: 100   // escribir vale más que reconocer; cada paso del proyecto +40 y terminarlo +100
 };
+const PASOS_PROYECTO = 3;
 /* Suspender un examen resta el 10 % de los puntos de ese rango (al menos 50): hay que volver a ganarlos */
 const multaExamen = k => Math.max(50, Math.round(RANGOS[k].min * 0.1));
 
@@ -54,7 +56,7 @@ const entero = (x, min = 0, max = 1e9) => { x = Math.round(Number(x)); return Nu
 function NUEVO() {
   return {
     v: 2, actualizado: 0, puntos: 0, rangoMax: 0, combo: 0, dias: {}, temas: {}, ejercicios: {}, tarjetas: {}, html: {}, bienvenida: false,
-    ingles: { unidades: {}, tarjetas: {} }, jerga: { bloques: {}, tarjetas: {} }, examenes: { reintento: 0, historial: [], repaso: [] },
+    ingles: { unidades: {}, tarjetas: {} }, jerga: { bloques: {}, tarjetas: {} }, examenes: { reintento: 0, historial: [], repaso: [] }, escritos: {}, proyectos: {},
     porLang: { ps: { retos: 0, aciertos: 0 }, py: { retos: 0, aciertos: 0 }, cpp: { retos: 0, aciertos: 0 } },
     ajustes: { meta: 20, metaIngles: 10, foco: 25, lang: 'mezcla', tema: 'auto', aspecto: 'sistema', vibrar: true, voz: 1 },
     plan: { checks: {}, regla: REGLA }
@@ -81,7 +83,7 @@ function normaliza(d, D, I, J) {
     if (Array.isArray(ex.historial)) n.examenes.historial = ex.historial.filter(x => x && typeof x === 'object' && esFecha(x.dia)).slice(-30)
       .map(x => ({ dia: x.dia, rango: entero(x.rango, 1, RANGOS.length - 1), bien: entero(x.bien), total: entero(x.total, 1, 100), aprobado: x.aprobado === true, abandonado: x.abandonado === true }));
     if (Array.isArray(ex.repaso)) n.examenes.repaso = ex.repaso.filter(x => x && x.spec && typeof x.spec === 'object' && Number.isFinite(x.spec.seed) &&
-      ((x.area === 'codigo' && D.porId[x.spec.tpl] && LANGS.includes(x.spec.lang)) || (x.area === 'ingles' && (!I || I.porId[x.spec.unidad])) || (x.area === 'habla' && (!J || J.porId[x.spec.bloque]))))
+      ((x.area === 'codigo' && D.porId[x.spec.tpl] && LANGS.includes(x.spec.lang)) || (x.area === 'escribe' && /^[a-z0-9-]{1,40}$/.test(x.spec.tarea) && LANGS.includes(x.spec.lang)) || (x.area === 'ingles' && (!I || I.porId[x.spec.unidad])) || (x.area === 'habla' && (!J || J.porId[x.spec.bloque]))))
       .slice(0, 40).map(x => ({ area: x.area, spec: JSON.parse(JSON.stringify(x.spec)) }));
   }
   if (d.dias && typeof d.dias === 'object') for (const k of Object.keys(d.dias)) {
@@ -121,6 +123,12 @@ function normaliza(d, D, I, J) {
   }
   if (ing.tarjetas && typeof ing.tarjetas === 'object') for (const k of Object.keys(ing.tarjetas)) {
     const x = ing.tarjetas[k]; if (itemValido(k) && x && typeof x === 'object') n.ingles.tarjetas[k] = tarjetaLimpia(x, hoy);
+  }
+  if (d.escritos && typeof d.escritos === 'object') for (const k of Object.keys(d.escritos)) {
+    const x = d.escritos[k]; if (/^[a-z0-9-]{1,40}$/.test(k) && x && typeof x === 'object') n.escritos[k] = { aciertos: entero(x.aciertos), fallos: entero(x.fallos) };
+  }
+  if (d.proyectos && typeof d.proyectos === 'object') for (const k of Object.keys(d.proyectos)) {
+    if (/^[1-9]$/.test(k)) n.proyectos[k] = entero(d.proyectos[k], 0, PASOS_PROYECTO);
   }
   const jg = d.jerga && typeof d.jerga === 'object' ? d.jerga : {};
   if (jg.bloques && typeof jg.bloques === 'object') for (const k of Object.keys(jg.bloques)) {
@@ -179,8 +187,9 @@ function estadoExamen(d) {
   const k = d.rangoMax + 1, R = RANGOS[k];
   if (!R) return null;
   const objetivo = Math.max(R.min, d.examenes.reintento), puntosOk = d.puntos >= R.min, espera = Math.max(0, objetivo - d.puntos), repaso = d.examenes.repaso.length;
-  return { rango: k, nombre: R.n, ...R.examen, sabe: R.sabe, min: R.min, objetivo, puntosOk, espera, repaso, multa: multaExamen(k),
-    disponible: espera === 0 && repaso === 0 && indiceRango(d) === d.rangoMax };
+  const proyecto = d.proyectos[k] || 0, proyectoHecho = proyecto >= PASOS_PROYECTO;
+  return { rango: k, nombre: R.n, ...R.examen, sabe: R.sabe, min: R.min, objetivo, puntosOk, espera, repaso, multa: multaExamen(k), proyecto, proyectoHecho,
+    disponible: espera === 0 && repaso === 0 && proyectoHecho && indiceRango(d) === d.rangoMax };
 }
 /* Suma (o resta) puntos sin bajar de 0 y dice qué cambió:
    «examen» = ya tienes los puntos del rango siguiente: toca su examen · «recupera» = vuelves a tu rango
@@ -200,16 +209,23 @@ function sumaPuntos(d, n) {
    Evalúa lo que debe saber ese rango: código (40 %), inglés (35 %) y habla de programador (25 %). La primera
    pregunta de cada parte es de lo más nuevo de ese rango, y el resto se reparte para que salga todo lo anterior.
    Devuelve las especificaciones; la pantalla genera las preguntas con ellas (siempre iguales con la misma semilla). */
-function planExamen(D, I, k, semilla, voz = { sale: false }, J = null) {
+function planExamen(D, I, k, semilla, voz = { sale: false }, J = null, E = null) {
   const R = RANGOS[k].examen, r = I.rng(semilla >>> 0 || 1), semillaNueva = () => Math.floor(r.f() * 2147483647);
   const nCod = Math.round(R.preguntas * (J ? 0.4 : 0.6)), nIng = J ? Math.round(R.preguntas * 0.35) : R.preguntas - nCod, nHab = J ? R.preguntas - nCod - nIng : 0;
-  const orden = lista => [lista[lista.length - 1], ...r.shuffle(lista)];   // lo más nuevo primero, luego todo
+  const orden = lista => [lista[lista.length - 1], ...r.shuffle(lista.slice(0, -1))];   // lo más nuevo primero, luego todo lo anterior sin repetir
   const temas = orden(D.temas.slice(0, R.temas)), unidades = orden(I.unidades.slice(0, R.unidades)), bloques = J ? orden(J.bloques.slice(0, R.bloques)) : [];
-  const tiposCod = ['salida', 'hueco', 'error', 'traducir', 'ordenar'];
+  const tiposCod = ['salida', 'completa', 'hueco', 'error', 'traducir', 'ordenar'];
+  // escribir desde cero: 1 pregunta hasta Pasante, 2 después; sale de las preguntas de código
+  const nEsc = E ? (k <= 2 ? 1 : 2) : 0, tareas = E ? E.tareas.filter(t => D.temas.findIndex(x => x.id === t.tema) < R.temas) : [];
+  const recientes = tareas.filter(t => t.tema === D.temas[R.temas - 1].id);
   const tiposIng = ['significado', 'palabra', 'hueco', 'ordenar', 'traducir', ...(voz.sale ? ['escucha', 'dictado'] : [])];
   const tiposHab = ['profesional', 'definicion', 'ingles', 'hueco', 'frase-en', 'termino'];
   const plan = [];
-  for (let q = 0; q < nCod; q++) {
+  for (let q = 0; q < nEsc; q++) {
+    const t = q === 0 && recientes.length ? r.pick(recientes) : r.pick(tareas);
+    plan.push({ area: 'escribe', tema: t.tema, spec: { tarea: t.id, lang: null, seed: semillaNueva() } });
+  }
+  for (let q = 0; q < nCod - nEsc; q++) {
     const t = temas[q % temas.length], tpl = r.pick(D.plantillas.filter(x => x.tema === t.id));
     plan.push({ area: 'codigo', tema: t.id, spec: { tpl: tpl.id, lang: r.pick(D.langsDe(tpl)), tipo: tiposCod[(q + k) % tiposCod.length], seed: semillaNueva() } });
   }
@@ -248,6 +264,17 @@ function registraRepasoExamen(d, i, ok) {
   let cambio = p.cambio;
   if (!cambio && ex && ex.disponible && !(exAntes && exAntes.disponible)) cambio = { tipo: 'examen', i: ex.rango };
   return { puntos: p.delta, cambio, quedan: d.examenes.repaso.length };
+}
+/* Un paso del proyecto del rango k (0, 1 o 2): bien lo da por hecho (+40, y +100 al terminar); mal resta */
+function registraPaso(d, k, paso, ok) {
+  const exAntes = estadoExamen(d), hechos = d.proyectos[k] || 0;
+  if (!ok) { const f = registraFallo(d, PUNTOS.ejercicioFallo); return { puntos: f.delta, cambio: f.cambio, hechos, terminado: false }; }
+  if (paso !== hechos) return { puntos: 0, cambio: null, hechos, terminado: hechos >= PASOS_PROYECTO };   // ya estaba hecho
+  d.proyectos[k] = hechos + 1; const terminado = d.proyectos[k] >= PASOS_PROYECTO;
+  const p = sumaPuntos(d, PUNTOS.paso + (terminado ? PUNTOS.proyecto : 0)), ex = estadoExamen(d);
+  let cambio = p.cambio;
+  if (!cambio && ex && ex.disponible && !(exAntes && exAntes.disponible)) cambio = { tipo: 'examen', i: ex.rango };
+  return { puntos: p.delta, cambio, hechos: d.proyectos[k], terminado };
 }
 /* Fallos que también restan: comprobar un ejercicio del laboratorio que no pasa, o un turno de conversación no entendido */
 function registraFallo(d, cuanto) { d.combo = 0; return Object.assign(sumaPuntos(d, cuanto), { combo: 0 }); }
@@ -319,8 +346,9 @@ function registraReto(d, D, r) {
   x.retos++; if (r.ok) x.aciertos++;
   anota(d.temas[r.tema] || (d.temas[r.tema] = { ultimos: [], intentos: 0, aciertos: 0 }), r.ok);
   const pl = d.porLang[r.lang]; if (pl) { pl.retos++; if (r.ok) pl.aciertos++; }
-  apuntaTarjeta(d, r.tpl, r.lang, r.ok);
-  const base = puntosRespuesta(d, r.ok, PUNTOS.reto, PUNTOS.retoFallo);
+  if (r.tpl) apuntaTarjeta(d, r.tpl, r.lang, r.ok);
+  if (r.tarea) { const e = d.escritos[r.tarea] || (d.escritos[r.tarea] = { aciertos: 0, fallos: 0 }); if (r.ok) e.aciertos++; else e.fallos++; }
+  const base = puntosRespuesta(d, r.ok, r.tipo === 'escribe' ? PUNTOS.escribe : r.tipo === 'completa' ? PUNTOS.completa : PUNTOS.reto, PUNTOS.retoFallo);
   const ahora = dominados(d, D), cinturon = ahora > antes ? ahora : 0, metaCumplida = x.retos === d.ajustes.meta;
   const p = sumaPuntos(d, base + (metaCumplida ? PUNTOS.meta : 0) + (cinturon ? PUNTOS.cinturon : 0));
   return { cinturon, metaCumplida, puntos: p.delta, cambio: p.cambio, combo: d.combo };
@@ -375,6 +403,7 @@ function registraConversacion(d, I, id, { turnos, bien }) {
 function siguientePaso(d, D, estado = {}, I = null) {
   const t = temaActual(d, D), e = estadoTema(d, D, t.id), hoy = leeDia(d), pend = pendientes(d, D).length;
   const ex = estadoExamen(d);
+  if (ex && ex.puntosOk && !ex.proyectoHecho && !ex.repaso && !estado.foco && indiceRango(d) === d.rangoMax) return { id: 'proyecto', titulo: `Termina tu proyecto para el examen de «${ex.nombre}»`, texto: `Ya tienes los puntos. Antes del examen, escribe el proyecto del rango: llevas ${ex.proyecto} de ${PASOS_PROYECTO} pasos. Se escribe a mano, como en papel.`, accion: 'examen', boton: 'Seguir el proyecto' };
   if (ex && ex.repaso && !estado.foco) return { id: 'repaso-examen', titulo: `Repasa lo que fallaste en el examen`, texto: `Te quedan ${ex.repaso} ${ex.repaso === 1 ? 'pregunta' : 'preguntas'} del examen de «${ex.nombre}». Respóndelas bien para poder repetirlo${ex.espera ? ` (y recupera ${ex.espera} puntos)` : ''}.`, accion: 'examen', boton: 'Repasar' };
   if (ex && ex.disponible && !estado.foco) return { id: 'examen', titulo: `Examen para «${ex.nombre}»`, texto: `Ya tienes los puntos. Para subir de rango, aprueba el examen: ${ex.preguntas} preguntas sin ayuda de código y de inglés; necesitas el ${Math.round(ex.nota * 100)} %.`, accion: 'examen', boton: 'Ver el examen' };
   if (estado.foco) return { id: 'foco', titulo: 'Estás en tu bloque de foco', texto: `Lee la lección de «${t.titulo}» y resuelve su ejercicio sin mirar a Claude.`, accion: 'tema', boton: 'Abrir la lección' };
@@ -408,7 +437,7 @@ function leeCodigoProgreso(txt, D, I, J) {
 }
 
 const Nucleo = { VERSION, LANGS, INTERVALOS, RANGOS, PUNTOS, hoyClave, sumaDias, diasAtras, NUEVO, normaliza, estadoTema, dominados, temaActual, racha, dia, leeDia,
-  rangoDe, rangoActual, estadoExamen, planExamen, registraExamen, registraRepasoExamen, registraFallo, multaExamen, sumaPuntos,
+  PASOS_PROYECTO, registraPaso, rangoDe, rangoActual, estadoExamen, planExamen, registraExamen, registraRepasoExamen, registraFallo, multaExamen, sumaPuntos,
   estadoBloque, bloquesDominados, bloqueActual, pendientesJerga, registraJerga, apuntaTarjeta, pendientes, debiles, registraReto, registraEjercicio, ejercicioHecho, siguientePaso, semana, totales, codigoProgreso, leeCodigoProgreso,
   estadoUnidad, unidadesDominadas, unidadActual, pendientesIngles, registraIngles, registraConversacion };
 if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo; else raiz.Nucleo = Nucleo;

@@ -179,6 +179,41 @@ unidades.push(
       T('Is this parameter required?', 'Di que no, que es opcional.', 'No, it is optional.', ['no it is optional', 'it is optional', 'no']),
       T('What is the default value?', 'Di que el valor por defecto es cero.', 'The default value is zero.', ['the default value is zero', 'zero', 'it is zero'])] }
 );
+/* Rangos altos (B2): revisar código y la entrevista técnica, en inglés */
+unidades.push(
+  { id: 'u13', nivel: 'B2', titulo: 'Revisiones de código', tema: 'Sugerir, pedir cambios y aprobar con educación',
+    palabras: [P('review', 'review', 'revisión / revisar', 'ri-viú'), P('suggest', 'suggest', 'sugerir', 'sa-yést'), P('approve', 'approve', 'aprobar', 'a-prúv'),
+      P('request-changes', 'request changes', 'pedir cambios', 'ri-kuést chéin-yes'), P('readable', 'readable', 'legible', 'rí-da-bol'), P('naming', 'naming', 'los nombres (de variables y funciones)', 'néi-ming'),
+      P('duplicate', 'duplicate', 'duplicado', 'diú-pli-keit'), P('edge-case', 'edge case', 'caso límite', 'ech kéis'), P('consistent', 'consistent', 'coherente', 'kon-sís-tent'),
+      P('nitpick', 'nitpick', 'detalle menor', 'nít-pik'), P('lgtm', 'looks good to me', 'me parece bien (LGTM)', 'luks gud tu mi'), P('catch', 'good catch', 'bien visto', 'gud kach')],
+    frases: [F('f1', 'Could you add a test for this?', '¿Podrías añadir una prueba para esto?', ['Can you add a test for this?']), F('f2', 'This name is not clear.', 'Este nombre no está claro.'),
+      F('f3', 'I suggest moving this into a function.', 'Sugiero pasar esto a una función.'), F('f4', 'Good catch, I will fix it.', 'Bien visto, lo arreglo.', ["Good catch, I'll fix it."]),
+      F('f5', 'What happens if the list is empty?', '¿Qué pasa si la lista está vacía?'), F('f6', 'Looks good to me, approved.', 'Me parece bien, aprobado.')],
+    gramatica: ['Para sugerir con educación: «Could you…?», «I suggest…» o «What do you think about…?». Suena mucho mejor que una orden.',
+      '«What happens if…?» sirve para preguntar por un caso límite sin acusar a nadie.',
+      'LGTM («looks good to me») se escribe al aprobar una revisión; «nit:» delante marca un detalle menor.'],
+    dialogo: [T('I left a comment on your pull request.', 'Da las gracias y di que lo miras ahora.', 'Thanks, I will check it now.', ['thanks i will check it now', 'thank you i will look at it now', 'thanks i will check it', 'i will check it now']),
+      T('Your function is very long.', 'Sugiere dividirla en dos funciones.', 'I suggest splitting it into two functions.', ['i suggest splitting it into two functions', 'i will split it into two functions', 'i can split it into two functions']),
+      T('What happens if the list is empty?', 'Di «bien visto» y que añadirás una prueba.', 'Good catch, I will add a test.', ['good catch i will add a test', 'good catch i will fix it', 'i will add a test']),
+      T('Is it ready to merge?', 'Di que sí, que te parece bien y lo apruebas.', 'Yes, it looks good to me.', ['yes it looks good to me', 'looks good to me', 'yes i approve it'])] },
+
+  { id: 'u14', nivel: 'B2', titulo: 'La entrevista técnica', tema: 'Hablar de ti, de tu experiencia y de cómo resuelves problemas',
+    palabras: [P('experience', 'experience', 'experiencia', 'ex-pí-riens'), P('skills', 'skills', 'habilidades', 'skils'), P('strength', 'strength', 'punto fuerte', 'strengz'),
+      P('weakness', 'weakness', 'punto débil', 'uík-nes'), P('project', 'project', 'proyecto', 'pró-yekt'), P('team', 'team', 'equipo', 'tiim'),
+      P('solve', 'solve', 'resolver', 'solv'), P('approach', 'approach', 'enfoque / forma de abordarlo', 'a-próuch'), P('trade-off', 'trade-off', 'ventaja a cambio de otra cosa', 'tréid of'),
+      P('salary', 'salary', 'sueldo', 'sá-la-ri'), P('remote', 'remote', 'en remoto', 'ri-móut'), P('hire', 'hire', 'contratar', 'jáier')],
+    frases: [F('f1', 'I have been learning to program for one year.', 'Llevo un año aprendiendo a programar.', ['I have been learning to code for one year.', "I've been learning to program for one year."]),
+      F('f2', 'My strength is that I never give up.', 'Mi punto fuerte es que nunca me rindo.'), F('f3', 'First, I would understand the problem.', 'Primero, entendería el problema.', ["First, I'd understand the problem."]),
+      F('f4', 'I built a small game in Python.', 'Hice un juego pequeño en Python.'), F('f5', 'I do not know, but I would find out.', 'No lo sé, pero lo averiguaría.', ["I don't know, but I would find out.", "I don't know, but I'd find out."]),
+      F('f6', 'Do you have any questions for us?', '¿Tienes alguna pregunta para nosotros?')],
+    gramatica: ['«I have been learning…» (present perfect continuo) dice desde cuándo haces algo y que sigues haciéndolo.',
+      '«I would…» (condicional) sirve para explicar cómo resolverías un problema: «First, I would…, then I would…».',
+      'Decir «I do not know, but I would find out» es mejor que inventar: en una entrevista se valora la honestidad.'],
+    dialogo: [T('Tell me about yourself.', 'Di tu nombre y cuánto tiempo llevas aprendiendo a programar.', 'I am Leo and I have been learning to program for one year.', ['i am * and i have been learning to program *', 'my name is * and i have been learning *', 'i have been learning to program for *']),
+      T('Tell me about a project you built.', 'Di que hiciste un juego pequeño en Python.', 'I built a small game in Python.', ['i built a small game in python', 'i made a small game in python', 'i built a game in *']),
+      T('How would you solve a problem you have never seen?', 'Di que primero entenderías el problema y luego lo dividirías en pasos.', 'First, I would understand the problem and then split it into steps.', ['first i would understand the problem and then split it into steps', 'first i would understand the problem', 'i would split it into steps']),
+      T('Do you have any questions for us?', 'Pregunta si el trabajo es en remoto.', 'Yes, is the job remote?', ['yes is the job remote', 'is the job remote', 'is it remote'])] }
+);
 const errores = [
   ["NameError: name 'total' is not defined", 'La variable total no existe (no tiene valor todavía)'],
   ['IndexError: list index out of range', 'La posición pedida no existe en la lista'],

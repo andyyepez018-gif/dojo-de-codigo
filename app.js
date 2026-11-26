@@ -3,7 +3,7 @@
    el curso de inglés en ingles.js (contenido) y vista-ingles.js (pantalla); la voz en voz.js. */
 (function () {
 'use strict';
-const D = window.Dojo, M = window.Motor, N = window.Nucleo, U = window.UI, E = window.Ejecutor, I = window.Ingles, J = window.Habla, Voz = window.Voz;
+const D = window.Dojo, W = window.Escribir, M = window.Motor, N = window.Nucleo, U = window.UI, E = window.Ejecutor, I = window.Ingles, J = window.Habla, Voz = window.Voz;
 const { $, h, ls, mmss, NL, aviso, bloqueCodigo, salidaBloque, cinturon, CINTURONES } = U;
 const LANGS = N.LANGS, VERSION = N.VERSION;
 const URL_APP = 'https://andyyepez018-gif.github.io/dojo-de-codigo/';
@@ -72,6 +72,7 @@ function mostrarActualizacion(sw) {
 
 /* ───────────── Rango, puntos y racha en la cabecera ───────────── */
 function pintaRango() {
+  actualizaInsignia();
   const rg = N.rangoActual(P.d), r = N.racha(P.d);
   for (const id of ['rango-lateral', 'rango-cabecera']) {
     const el = $('#' + id); if (!el) continue; el.textContent = '';
@@ -257,7 +258,7 @@ function accionPaso(p) {
   else if (p.accion === 'repaso') { P.d.ajustes.tema = 'repaso'; P.cambio(); nuevoReto(); ir('retos'); }
   else if (p.accion === 'ejercicio') { const t = temaActual(); const ej = t.ejercicios.find(e => !N.ejercicioHecho(P.d, e.id)) || t.ejercicios[0]; abrirLab({ ejercicio: ej.id }); }
   else if (p.accion === 'ingles') VI.practicar();
-  else if (p.accion === 'examen') { if (N.estadoExamen(P.d) && N.estadoExamen(P.d).repaso) VE.empiezaRepaso(); else ir('examen'); }
+  else if (p.accion === 'examen') { if (p.id === 'proyecto') VE.abreProyecto(); else if (N.estadoExamen(P.d) && N.estadoExamen(P.d).repaso) VE.empiezaRepaso(); else ir('examen'); }
   else if (p.accion === 'foco') empiezaFoco();
   else if (p.accion === 'tema') abrirTema(temaActual().id);
   else abrirLab({});
@@ -364,6 +365,15 @@ const colaSesion = [];
 const azar = arr => arr[Math.floor(Math.random() * arr.length)];
 const semilla = () => Math.floor(Math.random() * 2147483647);
 function tipoAlAzar() { const w = [['salida', 35], ['hueco', 20], ['ordenar', 15], ['error', 15], ['traducir', 15]]; let x = Math.random() * 100; for (const [t, p] of w) { if ((x -= p) < 0) return t; } return 'salida'; }
+/* El equilibrio entre reconocer y escribir: al empezar un tema, solo leer (es más fácil y se aprende viendo);
+   después, una cuarta parte de escribir; cuando ya lo dominas leyendo, el 40 %. Escribir es lo que más cuesta
+   y lo que de verdad enseña a programar: en papel, en el bloc de notas o donde sea. */
+function cuotaEscritura(temaId) { const e = est(temaId); return e.n < 3 ? 0 : e.prop >= 0.6 ? 0.4 : 0.25; }
+function tareaPara(temaId) {
+  const ts = W.tareas.filter(t => t.tema === temaId); if (!ts.length) return null;
+  const peso = t => { const x = P.d.escritos[t.id] || { aciertos: 0, fallos: 0 }; return 1 + x.fallos * 2 / (1 + x.aciertos) + (x.aciertos ? 0 : 2); };
+  return sorteo(ts, peso);
+}
 function sorteo(items, peso) { const ps = items.map(peso), tot = ps.reduce((a, b) => a + b, 0); let x = Math.random() * tot; for (let k = 0; k < items.length; k++) { if ((x -= ps[k]) < 0) return items[k]; } return items[items.length - 1]; }
 function elegirSpec() {
   const aj = P.d.ajustes, langsOk = aj.lang === 'mezcla' ? LANGS : [aj.lang];
@@ -386,12 +396,17 @@ function elegirSpec() {
   const t = sorteo(cands, x => (x.id === ultimaPlantilla && cands.length > 1 ? 0.15 : cajaMin(x) < 0 ? 4 : 1 + (5 - cajaMin(x)) * 0.6));
   ultimaPlantilla = t.id;
   const ok = D.langsDe(t).filter(l => langsOk.includes(l));
+  if (Math.random() < cuotaEscritura(temaId)) {
+    if (Math.random() < 0.45) { const ta = tareaPara(temaId); if (ta) return { escribe: ta.id, tema: temaId, lang: azar(langsOk) }; }
+    return { tpl: t.id, lang: azar(ok.length ? ok : D.langsDe(t)), tipo: 'completa', seed: semilla(), estricto: true };
+  }
   return { tpl: t.id, lang: azar(ok.length ? ok : D.langsDe(t)), tipo: (P.d.temas[temaId] || { intentos: 0 }).intentos < 3 ? 'salida' : tipoAlAzar(), seed: semilla() };
 }
 /* Genera un reto sin tocar el que está en pantalla */
 function generaReto() {
   for (let intento = 0; intento < 4; intento++) {
     const spec = elegirSpec();
+    if (spec.escribe) { const ta = W.porId[spec.escribe]; return { tipo: 'escribe', tema: spec.tema, lang: spec.lang, tarea: ta, spec, entradas: [], marca: '' }; }
     let r = null; try { r = D.generar(spec) || D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (e) { try { r = D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (x) { r = null; } }
     if (r) { r.marca = spec.marca || ''; return r; }
   }
@@ -400,7 +415,7 @@ function generaReto() {
 function nuevoReto() {
   retoListo = null;
   const r = generaReto(); if (!r) return;
-  reto = r; respondido = false; elegida = null; armado = []; resultadoOrden = null;
+  reto = r; respondido = false; elegida = null; armado = []; resultadoOrden = null; escrito = {}; resultadoEscrito = null;
 }
 /* El siguiente reto se prepara en segundo plano mientras respondes el actual: «Siguiente» sale al instante */
 let retoListo = null;
@@ -411,13 +426,13 @@ function preparaSiguiente() {
   if (window.requestIdleCallback) requestIdleCallback(hazlo, { timeout: 1500 }); else setTimeout(hazlo, 200);
 }
 function siguienteReto() {
-  if (retoListo && retoListo.clave === claveAjustes() && !retoDirigido) { reto = retoListo.reto; respondido = false; elegida = null; armado = []; resultadoOrden = null; }
+  if (retoListo && retoListo.clave === claveAjustes() && !retoDirigido) { reto = retoListo.reto; respondido = false; elegida = null; armado = []; resultadoOrden = null; escrito = {}; resultadoEscrito = null; }
   else nuevoReto();
   retoListo = null; PINTA.retos();
 }
 function registra(ok) {
-  const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.spec.tpl, lang: reto.lang, ok });
-  if (!ok) colaSesion.push({ tpl: reto.spec.tpl, lang: reto.lang, tipo: reto.tipo, seed: (reto.spec.seed + 104729) % 2147483647, tras: 0 });
+  const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.tipo === 'escribe' ? null : reto.spec.tpl, tarea: reto.tipo === 'escribe' ? reto.tarea.id : null, tipo: reto.tipo, lang: reto.lang, ok });
+  if (!ok && reto.tipo !== 'escribe') colaSesion.push({ tpl: reto.spec.tpl, lang: reto.lang, tipo: reto.tipo, seed: (reto.spec.seed + 104729) % 2147483647, tras: 0 });
   ultimoRes = res; trataPuntos(res, ok);
   if (res.cinturon) U.celebra(res.cinturon, `Dominaste «${D.temas.find(t => t.id === reto.tema).titulo}». Siguiente tema: «${temaActual().titulo}».`);
   else if (res.metaCumplida) aviso(`Meta de hoy cumplida: ${P.d.ajustes.meta} retos. +${N.PUNTOS.meta} puntos.`);
@@ -455,6 +470,20 @@ function cuerpoReto() {
     const b = bloqueCodigo(r.codigoMal, l, respondido ? {} : { tocar: i => { r.correcta = r.lineaMal; responde(i); } });
     if (respondido) { const lis = b.querySelectorAll('li'); lis[r.lineaMal].classList.add('buena'); if (elegida !== r.lineaMal && lis[elegida]) lis[elegida].classList.add('marcada'); }
     partes.push(b);
+  } else if (r.tipo === 'completa') {
+    partes.push(h('h2', null, 'Escribe la línea que falta'), h('p', { class: 'tenue' }, 'Sin opciones: escríbela tú. El programa tiene que mostrar exactamente esto:'), salidaBloque(r.salida), chipsEntradas(),
+      bloqueCodigo(r.codigoConHueco, l));
+    const campo = h('input', { class: 'campo mono linea-escrita', id: 'linea-escrita', type: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': `La línea ${r.linea + 1}, escrita por ti en ${NL[l]}`, placeholder: `Línea ${r.linea + 1}`, disabled: respondido || null,
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); compruebaLinea(campo.value); } } });
+    if (escrito.linea !== undefined) campo.value = escrito.linea;
+    campo.addEventListener('input', () => { escrito.linea = campo.value; });
+    partes.push(campo, respondido ? null : h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => compruebaLinea(campo.value) }, 'Comprobar')));
+  } else if (r.tipo === 'escribe') {
+    const t = r.tarea;
+    partes.push(h('h2', null, `Escríbelo en ${NL[l]}`), h('p', { class: 'enunciado' }, t.enunciado),
+      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco, como en papel: sin colores ni ayudas. Se comprobará con varios datos distintos.' + (l === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')),
+      hojaPapel('hoja-escribe', `Tu programa en ${NL[l]}`, respondido, () => compruebaEscrito()));
+    if (!respondido) partes.push(h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: compruebaEscrito }, 'Comprobar'), h('span', { class: 'atajos' }, 'Tab pone 4 espacios · Ctrl+Enter comprueba')));
   } else if (r.tipo === 'traducir') {
     partes.push(h('h2', null, `¿Cuál es este programa en ${NL[l]}?`), h('span', { class: 'etiqueta' }, 'En ' + NL[r.origen]), bloqueCodigo(r.codigoOrigen, r.origen), chipsEntradas());
     const g = h('div', { class: 'opciones una', role: 'group', 'aria-label': 'Opciones' });
@@ -467,10 +496,55 @@ function cuerpoReto() {
   }
   return partes;
 }
+/* Escribir: lo escrito se guarda por reto (si la pantalla se repinta, no se pierde) */
+let escrito = {};
+const hojaPapel = (id, etiqueta, bloqueada, alComprobar) => U.hojaPapel({ id, etiqueta, bloqueada, valor: escrito[id] || '', alCambiar: v => { escrito[id] = v; }, alComprobar });
+let resultadoEscrito = null;
+function compruebaLinea(valor) {
+  if (respondido || !reto) return;
+  if (!String(valor || '').trim()) { aviso('Escribe la línea primero.'); return; }
+  resultadoEscrito = D.compruebaCompleta(reto, valor); resultadoEscrito.escrita = valor.trim();
+  respondido = true; elegida = resultadoEscrito.ok ? 0 : 1; reto.correcta = 0; registra(resultadoEscrito.ok); PINTA.retos();
+}
+function compruebaEscrito() {
+  if (respondido || !reto) return;
+  const codigo = escrito['hoja-escribe'] || '';
+  if (!codigo.trim()) { aviso('Escribe tu programa primero.'); return; }
+  resultadoEscrito = W.corrige(codigo, reto.lang, reto.tarea.pruebas, D); resultadoEscrito.codigo = codigo;
+  respondido = true; elegida = resultadoEscrito.ok ? 0 : 1; reto.correcta = 0; registra(resultadoEscrito.ok); PINTA.retos();
+}
+const listaPruebas = U.listaPruebas;
+function respuestaEscribe() {
+  const r = reto, x = resultadoEscrito, ok = x.ok, sol = r.tarea.sol[r.lang];
+  const caja = h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' }, h('div', { class: 'entre' }, h('h3', null, ok ? 'Funciona: lo escribiste tú' : 'Todavía no funciona'), chipPuntos(ultimoRes)));
+  caja.append(listaPruebas(x.resultados));
+  caja.append(h('details', { class: 'desplegable' }, h('summary', null, ok ? 'Comparar con otra solución' : 'Ver una solución'), bloqueCodigo(sol, r.lang),
+    h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hay muchas formas correctas. Si la miras, escríbela tú otra vez más tarde sin mirarla: así se queda.')));
+  caja.append(h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'siguiente', onclick: siguienteReto }, 'Siguiente reto'),
+    h('button', { class: 'btn plano', onclick: () => abrirLab({ lang: r.lang, codigo: W.prepara(x.codigo, r.lang, D), entradas: r.tarea.pruebas[0].entradas }) }, 'Abrir lo mío en el laboratorio')));
+  caja.append(botonTutor('Explícame qué falla', () => `${REGLAS_TUTOR}
+
+Un alumno escribió este programa en ${NL[r.lang]} para esta tarea: «${r.tarea.enunciado}».
+
+Su programa:
+${x.codigo}
+
+${ok ? 'Funciona. Dile en 2 o 3 frases qué hizo bien y una cosa que podría escribir más clara.' : 'No pasa las pruebas. Explícale en 3 a 5 frases qué falla y cómo pensarlo, sin darle el programa entero.'}
+
+Pruebas:
+${x.resultados.map(p => `Datos: ${p.entradas.join(', ') || '(ninguno)'} · Debía mostrar: ${p.esperado} · Mostró: ${p.error ? 'error: ' + p.error.message : p.salida}`).join('\n')}`));
+  return caja;
+}
 function respuestaReto() {
+  if (reto.tipo === 'escribe') return respuestaEscribe();
   const r = reto, ok = elegida === r.correcta;
   const caja = h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' }, h('div', { class: 'entre' }, h('h3', null, ok ? 'Correcto' : r.tipo === 'ordenar' ? 'Ese orden no da lo mismo' : 'No era esa'), chipPuntos(ultimoRes)));
-  if (r.tipo === 'error') caja.append(h('p', null, `El error está en la línea ${r.lineaMal + 1}. ${r.explicaError}`), h('p', { class: 'tenue' }, `El Dojo lo avisaría así: «${r.mensajeMotor}»`));
+  if (r.tipo === 'completa') {
+    const x = resultadoEscrito;
+    caja.append(h('p', null, 'Escribiste: ', h('code', { class: 'mono' }, x.escrita)));
+    if (!x.ok) caja.append(h('p', null, x.error ? `Con tu línea, el programa da un error: ${x.error.message}` : 'Con tu línea, el programa muestra:'), x.error ? '' : salidaBloque(x.salida || ''));
+    caja.append(h('p', null, ok ? 'Una forma de escribirla: ' : 'La línea era: ', h('code', { class: 'mono' }, r.lineaQuitada)), h('p', null, r.explica));
+  } else if (r.tipo === 'error') caja.append(h('p', null, `El error está en la línea ${r.lineaMal + 1}. ${r.explicaError}`), h('p', { class: 'tenue' }, `El Dojo lo avisaría así: «${r.mensajeMotor}»`));
   else if (r.tipo === 'ordenar') {
     if (!ok) caja.append(h('p', null, resultadoOrden.error ? `Con tu orden el programa da un error en la línea ${resultadoOrden.error.linea}: ${resultadoOrden.error.message}` : 'Con tu orden el programa muestra:'), resultadoOrden.error ? '' : salidaBloque(resultadoOrden.salida), h('span', { class: 'etiqueta' }, 'Un orden que funciona'), bloqueCodigo(r.codigo, r.lang));
     caja.append(h('p', null, r.explica));
@@ -833,6 +907,7 @@ const CHECKS = [
   ['dojo-inicio', 'Instala el Dojo y ponlo en la pantalla de inicio', 'En Android, desde Chrome: menú ⋮ → «Instalar app». En el PC, el icono de instalar de Chrome o Edge. En iPhone, desde Safari: Compartir → Añadir a la pantalla de inicio. Ponlo justo donde estaba TikTok.'],
   ['tiktok', 'Saca TikTok de la pantalla de inicio y ponle un límite', 'Android: Ajustes → Bienestar digital → Temporizadores de apps. iPhone: Ajustes → Tiempo de uso → Límites de apps.'],
   ['avisos', 'Activa los avisos de Claude', 'Que te avise cuando termina, para no vigilarlo. En el PC, Claude Code puede sonar al acabar: pídeselo en el chat del proyecto y lo deja configurado.'],
+  ['recordatorio', 'Pon el recordatorio diario del Dojo', 'Aquí abajo, en «Recordatorio diario»: se añade a tu calendario y suena cada día a tu hora.'],
   ['hora', 'Elige la hora de tu bloque de foco', 'Siempre la misma, por ejemplo después de comer. Escríbela en tu regla de abajo.'],
   ['pc', 'Instala PSeInt, Python y C++ en tu PC', 'Para cuando quieras ir más allá del laboratorio: PSeInt (pseint.sourceforge.net), Python (python.org) y C++ con VS Code o Code::Blocks.']
 ];
@@ -857,6 +932,7 @@ PINTA.plan = function () {
     h('section', { class: 'tarjeta', id: 'puntos' }, h('h2', null, 'Rangos y puntos'),
       h('p', { class: 'tenue' }, 'Diez rangos, de Aprendiz a Ingeniero de élite. Cada acierto suma y cada fallo resta, así que no vale responder a lo loco. Al llegar a los puntos de un rango se abre su examen: preguntas de código y de inglés de todo lo que deberías saber a ese nivel, sin tutor, sin pistas y sin saber si aciertas hasta el final. Solo subes si lo apruebas.'),
       escaleraRangos(), tablaPuntos()),
+    tarjetaRecordatorio(),
     h('section', { class: 'tarjeta' }, h('h2', null, 'Tu regla «si… entonces»'), h('p', { class: 'tenue' }, 'Escríbela con tus palabras. Concreta y con un momento fijo funciona mejor.'), regla),
     h('section', { class: 'tarjeta' }, h('h2', null, 'Ajustes'),
       h('div', { class: 'ajustes' },
@@ -868,6 +944,51 @@ PINTA.plan = function () {
         selector('aj-vibrar', 'Vibrar al responder', aj.vibrar ? 'si' : 'no', [['si', 'Sí'], ['no', 'No']], v => { aj.vibrar = v === 'si'; P.cambio(); U.vibra(18, aj.vibrar); }))),
     tarjetaApp(), tarjetaCopia(), tarjetaPrivacidad()));
 };
+/* ───────────── Recordatorio diario (un evento del calendario que se repite) e insignia del icono ───────────── */
+const dos = n => String(n).padStart(2, '0');
+function archivoRecordatorio(hora) {
+  const [hh, mm] = hora.split(':').map(Number), hoy = new Date(), ahora = new Date();
+  const inicio = `${hoy.getFullYear()}${dos(hoy.getMonth() + 1)}${dos(hoy.getDate())}T${dos(hh)}${dos(mm)}00`;
+  const sello = `${ahora.getUTCFullYear()}${dos(ahora.getUTCMonth() + 1)}${dos(ahora.getUTCDate())}T${dos(ahora.getUTCHours())}${dos(ahora.getUTCMinutes())}00Z`;
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Dojo de codigo//ES', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+    `UID:dojo-diario-${Date.now()}@dojo-de-codigo`, `DTSTAMP:${sello}`, `DTSTART:${inicio}`, 'DURATION:PT25M', 'RRULE:FREQ=DAILY',
+    'SUMMARY:Dojo de código: retos\\, inglés y habla', `DESCRIPTION:Tu rato de práctica. Abre el Dojo: ${URL_APP}`, `URL:${URL_APP}`,
+    'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Hora del Dojo', 'TRIGGER:PT0M', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+}
+async function guardaRecordatorio(hora) {
+  const datos = archivoRecordatorio(hora), nombre = 'dojo-recordatorio-diario.ics';
+  try {
+    if (enClaude) {
+      const dl = await window.claude.use('downloads');
+      if (!dl) { aviso('Aquí no se pueden guardar archivos. Hazlo desde la app instalable.', 5000); return; }
+      await dl.save({ filename: nombre, data: datos });
+    } else {
+      const url = URL.createObjectURL(new Blob([datos], { type: 'text/calendar' }));
+      const a = h('a', { href: url, download: nombre }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+    P.d.plan.checks.recordatorio = true; P.cambio(); PINTA.plan();
+    aviso('Ábrelo y elige «Añadir» en tu calendario: sonará cada día a las ' + hora + '.', 6000);
+  } catch (e) { aviso(e && e.code === 'host_unavailable' ? 'Esta app de Claude no guarda archivos: ábrelo en el navegador o en la app instalable.' : 'No se guardó el recordatorio.', 5000); }
+}
+function tarjetaRecordatorio() {
+  let hora = ls.get('recordatorio-hora', '18:00');
+  const sel = h('select', { class: 'campo', id: 'hora-recordatorio', 'aria-label': 'Hora del recordatorio', onchange: e => { hora = e.target.value; ls.set('recordatorio-hora', hora); } },
+    ...Array.from({ length: 36 }, (_, k) => { const m = 6 * 60 + k * 30; const v = `${dos(Math.floor(m / 60))}:${dos(m % 60)}`; return h('option', { value: v }, v); }));
+  sel.value = hora;
+  return h('section', { class: 'tarjeta', id: 'recordatorio' }, h('h2', null, 'Recordatorio diario'),
+    h('p', { class: 'tenue' }, 'Un aviso cada día a tu hora, para que el Dojo le gane a TikTok. Se guarda en el calendario de tu móvil o de tu PC (Google Calendar, el de Samsung, el del iPhone o Outlook) y suena aunque la app esté cerrada.'),
+    h('div', { class: 'fila' }, h('label', { class: 'ajuste', for: 'hora-recordatorio' }, h('span', null, 'Hora'), sel), h('button', { class: 'btn primario', onclick: () => guardaRecordatorio(sel.value) }, 'Añadir al calendario')),
+    h('p', { class: 'tenue', style: 'font-size:13px' }, 'Se descarga un archivo de calendario: ábrelo y elige «Añadir» o «Guardar». Para quitarlo, bórralo desde tu calendario.'));
+}
+/* El número de cosas pendientes sobre el icono de la app instalada (donde el sistema lo permite) */
+function actualizaInsignia() {
+  try {
+    if (!navigator.setAppBadge) return;
+    const ex = N.estadoExamen(P.d);
+    const n = N.pendientes(P.d, D).length + N.pendientesIngles(P.d, I).length + N.pendientesJerga(P.d, J).length + (ex && (ex.disponible || ex.repaso) ? 1 : 0);
+    (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+  } catch (e) { /* sin insignia */ }
+}
 function tarjetaApp() {
   const partes = [h('h2', null, 'La app')];
   if (enClaude) partes.push(h('p', { class: 'tenue' }, 'Estás usando la versión dentro de Claude: guarda tu progreso en tu cuenta y tiene el tutor.'),
@@ -909,7 +1030,7 @@ function tarjetaPrivacidad() {
 }
 
 /* ───────────── INGLÉS (vista-ingles.js) ───────────── */
-const VE = window.VistaExamen({ P, N, D, I, J, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista: () => vista });
+const VE = window.VistaExamen({ P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista: () => vista });
 const VH = window.VistaHabla({ P, N, J, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, vista: () => vista });
 PINTA.habla = () => VH.pinta();
 PINTA.examen = () => VE.pinta();

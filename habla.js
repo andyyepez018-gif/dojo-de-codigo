@@ -129,6 +129,49 @@ const bloques = [
         'Resuelto a las 11:20. La causa fue una tabla llena. Para que no vuelva a pasar, añadimos una alerta.', 'Resolved at 11:20. The cause was a full table. To prevent it from happening again, we added an alert.')] }
 ];
 
+/* Rangos altos: explicar un diseño y defenderse en una entrevista de trabajo */
+bloques.push(
+  { id: 'b7', titulo: 'Diseño y arquitectura', tema: 'Explicar cómo está hecho un sistema',
+    terminos: [
+      T('modulo', 'módulo', 'module', 'Una parte del programa con una responsabilidad clara.', 'El módulo de pagos no sabe nada de la interfaz.'),
+      T('interfaz', 'interfaz', 'interface', 'Lo que una parte ofrece a las demás para usarla, sin enseñar cómo está hecha por dentro.', 'Si la interfaz no cambia, podemos cambiar el código de dentro.'),
+      T('acoplamiento', 'acoplamiento', 'coupling', 'Cuánto depende una parte de otra: poco acoplamiento es mejor.', 'Hay mucho acoplamiento entre esas dos clases.'),
+      T('patron', 'patrón de diseño', 'design pattern', 'Una solución conocida para un problema que se repite.', 'Aquí encaja un patrón de diseño muy común.'),
+      T('cache', 'caché', 'cache', 'Una copia guardada de datos para no volver a calcularlos o pedirlos.', 'Con una caché, la página carga más rápido.'),
+      T('cuello', 'cuello de botella', 'bottleneck', 'La parte más lenta, la que frena todo el sistema.', 'El cuello de botella está en la base de datos.'),
+      T('compromiso', 'compromiso', 'trade-off', 'Ganar algo a cambio de perder otra cosa.', 'Es un compromiso: más rápido pero usa más memoria.'),
+      T('diagrama', 'diagrama', 'diagram', 'Un dibujo que muestra las partes de un sistema y cómo se hablan.', 'Hice un diagrama con los tres servicios.')],
+    situaciones: [
+      S('explicar-diseno', 'Te piden explicar cómo está hecho tu programa.', 'Pues todo está en un archivo y funciona.', ['Es complicado, mejor mira el código.', 'Lo hice como me salió.'],
+        'Tiene tres partes: la entrada de datos, los cálculos y la pantalla. Cada una en su módulo.', 'It has three parts: data input, calculations and the screen. Each one in its own module.'),
+      S('proponer-cache', 'La página es lenta y tienes una idea.', 'Esto va lentísimo, hay que rehacerlo.', ['Compramos un servidor más grande y listo.', 'No es problema mío.'],
+        'El cuello de botella son las consultas repetidas. Propongo una caché; lo mido antes y después.', 'The bottleneck is the repeated queries. I propose a cache; I will measure before and after.'),
+      S('elegir-opcion', 'Tienes que elegir entre dos soluciones.', 'Da igual, cualquiera vale.', ['Elige tú, yo no opino.', 'La mía es mejor porque sí.'],
+        'La opción A es más simple; la B es más rápida pero más difícil de mantener. Para hoy recomiendo A.', 'Option A is simpler; B is faster but harder to maintain. For now I recommend A.'),
+      S('desacuerdo', 'No estás de acuerdo con el diseño de un compañero.', 'Eso está mal pensado.', ['Te callas y lo haces a tu manera.', 'Te quejas con otro compañero.'],
+        'Entiendo tu idea. Me preocupa el acoplamiento entre estas dos partes. ¿Lo vemos con un diagrama?', 'I understand your idea. I am worried about the coupling between these two parts. Shall we look at it with a diagram?')] },
+
+  { id: 'b8', titulo: 'Entrevistas y carrera', tema: 'Conseguir trabajo y crecer',
+    terminos: [
+      T('cv', 'currículum', 'résumé (CV)', 'El documento con tu experiencia, estudios y habilidades.', 'Pon tus proyectos en el currículum.'),
+      T('portafolio', 'portafolio', 'portfolio', 'Tus proyectos publicados para que otros los vean.', 'Mi portafolio tiene tres proyectos en GitHub.'),
+      T('entrevista', 'entrevista técnica', 'technical interview', 'La parte de la entrevista donde resuelves problemas de programación.', 'En la entrevista técnica me pidieron invertir un texto.'),
+      T('habilidades', 'habilidades blandas', 'soft skills', 'Saber comunicarte, trabajar en equipo y organizarte.', 'Las habilidades blandas pesan tanto como el código.'),
+      T('salario', 'salario', 'salary', 'Lo que te pagan por tu trabajo.', 'Pregunté por el salario al final de la entrevista.'),
+      T('remoto', 'trabajo en remoto', 'remote work', 'Trabajar desde casa o desde cualquier sitio.', 'Me interesa el trabajo en remoto.'),
+      T('mentor', 'mentor', 'mentor', 'Alguien con experiencia que te guía.', 'Mi mentor revisa mi código cada semana.'),
+      T('practicas', 'prácticas', 'internship', 'Un trabajo para aprender, normalmente al empezar.', 'Empecé con unas prácticas de seis meses.')],
+    situaciones: [
+      S('presentarte', 'En una entrevista te dicen: «Háblame de ti».', 'Pues nada, soy yo, me gusta la informática.', ['Lees tu currículum de memoria.', 'Hablas diez minutos de tu vida.'],
+        'Llevo un año aprendiendo a programar en Python. Hice un juego y una calculadora, y busco mi primer trabajo.', 'I have been learning to program in Python for a year. I built a game and a calculator, and I am looking for my first job.'),
+      S('no-se-entrevista', 'Te preguntan algo técnico que no sabes.', 'Eso no lo vi nunca.', ['Inventas una respuesta segura.', 'Te quedas en silencio.'],
+        'No lo he usado, pero lo pensaría así: primero entendería el problema y lo dividiría en pasos.', 'I have not used it, but I would think about it like this: first I would understand the problem and split it into steps.'),
+      S('punto-debil', 'Te preguntan por tu punto débil.', 'No tengo ninguno.', ['Soy demasiado perfeccionista (sin más).', 'Soy muy vago.'],
+        'Me cuesta pedir ayuda a tiempo; ahora me pongo un límite de treinta minutos antes de preguntar.', 'I find it hard to ask for help in time; now I set a limit of thirty minutes before asking.'),
+      S('preguntar', 'Al final te preguntan si tienes alguna pregunta.', 'No, nada.', ['¿Cuántas vacaciones hay? (y nada más).', '¿Cuándo me pagan?'],
+        '¿Cómo es un día normal en el equipo y cómo revisáis el código?', 'What is a normal day like in the team, and how do you review code?')] }
+);
+
 const porId = {}; bloques.forEach((b, k) => { b.n = k + 1; porId[b.id] = b; });
 const TIPOS = ['definicion', 'termino', 'ingles', 'hueco', 'profesional', 'frase-en'];
 const NOMBRE_TIPO = { definicion: '¿Qué término es?', termino: '¿Qué significa?', ingles: '¿Cómo se dice en inglés?', hueco: 'Completa la frase', profesional: '¿Cómo lo dice un profesional?', 'frase-en': 'Dilo en inglés profesional' };

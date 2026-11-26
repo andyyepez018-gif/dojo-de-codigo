@@ -690,8 +690,8 @@ plantillas.forEach(t => { t.titulo = TITULOS[t.id] || t.id; });
 const limpia = s => String(s).split('\n').map(l => l.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '');
 const porId = {}; plantillas.forEach(t => { porId[t.id] = t; });
 const langsDe = t => t.solo || ['ps', 'py', 'cpp'];
-const TIPOS = ['salida', 'hueco', 'ordenar', 'error', 'traducir'];
-const NOMBRE_TIPO = { salida: '¿Qué muestra?', hueco: 'Completa el hueco', ordenar: 'Ordena las líneas', error: 'Encuentra el error', traducir: 'Traduce' };
+const TIPOS = ['salida', 'hueco', 'ordenar', 'error', 'traducir', 'completa'];
+const NOMBRE_TIPO = { salida: '¿Qué muestra?', hueco: 'Completa el hueco', ordenar: 'Ordena las líneas', error: 'Encuentra el error', traducir: 'Traduce', completa: 'Escribe la línea que falta', escribe: 'Escríbelo tú' };
 
 function ejecuta(codigo, lang, entradas) {
   const r = raiz.Motor.correr(codigo, lang, entradas);
@@ -752,7 +752,7 @@ function generar(spec) {
   if (base.error) throw new Error(`La plantilla ${t.id} (${lang}) falla: ${base.error.message}`);
   const reto = { spec: { ...spec }, tema: t.tema, lang, codigo, entradas, salida: base.salida, explica: t.explica(p, lang), tipo: spec.tipo };
   const conTipo = tipo => { reto.tipo = tipo; reto.spec.tipo = tipo; };
-  const arma = { hueco: () => hueco(reto, r), ordenar: () => ordenar(reto, r), error: () => error(reto, r), traducir: () => traducir(reto, t, p, spec, r) };
+  const arma = { hueco: () => hueco(reto, r), ordenar: () => ordenar(reto, r), error: () => error(reto, r), traducir: () => traducir(reto, t, p, spec, r), completa: () => completaLinea(reto, r) };
   if (spec.tipo !== 'salida') {
     // Si la clase pedida no encaja con este programa (p. ej. dos líneas no se pueden ordenar), se prueba
     // otra que sí encaje antes de caer en «¿Qué muestra?»: así los retos no se repiten.
@@ -790,6 +790,28 @@ function hueco(reto, r) {
     };
   }
   return null;
+}
+/* «Escribe la línea que falta»: se quita una línea con contenido y hay que escribirla (sin opciones).
+   Solo se quitan líneas cuya falta cambia lo que muestra el programa, para que no valga dejarla vacía. */
+const ESTRUCTURA = /^\s*(\}|\{|FinSi|SiNo|FinMientras|FinPara|FinFuncion|FinAlgoritmo|Algoritmo\b.*|Proceso\b.*|else\s*:?|else\s*\{?|Repetir|return 0;|#include.*|using namespace.*|int main\(\).*)\s*$/;
+function completaLinea(reto, r) {
+  const ls = reto.codigo.split('\n');
+  if (ls.filter(l => l.trim()).length < 2) return null;   // con una sola línea no queda nada alrededor: eso es «escríbelo tú»
+  const cands = ls.map((l, i) => i).filter(i => ls[i].trim() && !ESTRUCTURA.test(ls[i]) && ls[i].trim().length >= 5);
+  for (const i of r.shuffle(cands)) {
+    const sin = ejecuta(ls.filter((_, k) => k !== i).join('\n'), reto.lang, reto.entradas);
+    if (!sin.error && sin.salida === reto.salida) continue;   // sin esa línea saldría lo mismo: no sirve
+    const sangria = ls[i].match(/^\s*/)[0];
+    return { linea: i, lineaQuitada: ls[i].trim(), sangria, codigoConHueco: ls.map((l, k) => (k === i ? sangria + '____' : l)).join('\n') };
+  }
+  return null;
+}
+/* Comprueba la línea escrita: se pone en su sitio (con la sangría original) y el programa debe mostrar lo mismo */
+function compruebaCompleta(reto, escrita) {
+  const txt = String(escrita || '').trim(); if (!txt) return { ok: false, vacio: true };
+  const ls = reto.codigo.split('\n'); ls[reto.linea] = reto.sangria + txt.replace(/\n\s*/g, ' ');
+  const res = ejecuta(ls.join('\n'), reto.lang, reto.entradas);
+  return { ok: !res.error && res.salida === reto.salida, salida: res.salida, error: res.error };
 }
 function ordenar(reto, r) {
   const ls = reto.codigo.split('\n').filter(l => l.trim() !== '');
@@ -856,6 +878,6 @@ function compruebaEjercicio(codigo, lang, pruebas) {
 
 const ejercicioPorId = id => { for (const t of temas) for (const e of t.ejercicios) if (e.id === id) return { tema: t, ej: e }; return null; };
 
-raiz.Dojo = { compruebaEjercicio, ejercicioPorId, temas, plantillas, html, porId, langsDe, generar, compruebaOrden, completo, limpia, rng, TIPOS, NOMBRE_TIPO, NOMBRE_LANG: L };
+raiz.Dojo = { compruebaEjercicio, compruebaCompleta, ejercicioPorId, temas, plantillas, html, porId, langsDe, generar, compruebaOrden, completo, limpia, rng, TIPOS, NOMBRE_TIPO, NOMBRE_LANG: L };
 if (typeof module !== 'undefined' && module.exports) module.exports = raiz.Dojo;
 })(typeof window !== 'undefined' ? window : globalThis);

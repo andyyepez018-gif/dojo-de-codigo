@@ -1,4 +1,4 @@
-/* Dojo de código · la pantalla de Inglés: las 12 unidades, la práctica con repaso espaciado (escuchar, leer,
+/* Dojo de código · la pantalla de Inglés: las unidades del A1 al B2, la práctica con repaso espaciado (escuchar, leer,
    escribir y hablar) y la conversación guiada. Si estás en Claude, además, conversación libre con Claude.
    La app (app.js) le pasa lo que comparte: el progreso, los puntos, el tutor y la navegación. */
 (function (raiz) {
@@ -6,7 +6,7 @@
 raiz.VistaIngles = function (ctx) {
   const { P, N, I, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, sample, vista } = ctx;
   const { $, h, ls } = U;
-  const NIVEL = { A1: 'A1 · Principiante', A2: 'A2 · Básico', B1: 'B1 · Intermedio' };
+  const NIVEL = { A1: 'A1 · Principiante', A2: 'A2 · Básico', B1: 'B1 · Intermedio', B2: 'B2 · Intermedio alto' };
   const ICONO_OIR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>';
   const ICONO_MIC = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/></svg>';
   const REGLAS_PROFE = 'Eres un profesor de inglés paciente para programadores hispanohablantes que empiezan desde cero. Explicas en español sencillo, de tú, con frases cortas, sin saludos ni felicitaciones y sin formato Markdown. Cuando des una palabra en inglés, añade cómo se pronuncia escrita como se leería en español.';
@@ -113,7 +113,7 @@ raiz.VistaIngles = function (ctx) {
   }
   function celebraUnidad(sig, u) {
     const fin = N.unidadesDominadas(P.d, I) >= I.unidades.length;
-    U.celebra(0, fin ? 'Terminaste las 12 unidades: ya puedes leer documentación, pedir ayuda y hablar en una reunión en inglés. Sigue repasando.' : `+${N.PUNTOS.unidad} puntos. Siguiente: unidad ${sig.n}, «${sig.titulo}».`,
+    U.celebra(0, fin ? `Terminaste las ${I.unidades.length} unidades: ya puedes leer documentación, pedir ayuda y hablar en una reunión y en una entrevista en inglés. Sigue repasando.` : `+${N.PUNTOS.unidad} puntos. Siguiente: unidad ${sig.n}, «${sig.titulo}».`,
       { figura: h('span', { class: 'sello-en grande', 'aria-hidden': 'true' }, 'EN'), etiqueta: 'Unidad de inglés dominada', titulo: `Unidad ${u.n}: ${u.titulo}` });
   }
   function responde(k) { if (st.respondido || !st.ej) return; st.elegida = k; registrar(k === st.ej.correcta); }
@@ -352,7 +352,7 @@ raiz.VistaIngles = function (ctx) {
     const cab = h('section', { class: 'tarjeta portada-en' },
       h('span', { class: 'etiqueta' }, 'Inglés para programar · desde cero'),
       h('h1', null, 'Escúchalo, léelo y háblalo'),
-      h('p', { class: 'tenue' }, 'El inglés que usan los programadores: leer errores y documentación, pedir ayuda y hablar en una reunión. 12 unidades, del nivel A1 al B1.'),
+      h('p', { class: 'tenue' }, `El inglés que usan los programadores: leer errores y documentación, pedir ayuda, revisar código y pasar una entrevista. ${I.unidades.length} unidades, del nivel A1 al B2.`),
       h('div', { class: 'fila' }, h('span', { class: 'insignia ai' }, NIVEL[actual.nivel]), h('span', { class: 'insignia num' }, `${dom} de ${I.unidades.length} unidades`), h('span', { class: 'insignia num ' + (d.ingles >= meta ? 'bien' : 'kihada') }, `Hoy ${d.ingles} de ${meta}`)),
       h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => practicar() }, 'Practicar'), h('button', { class: 'btn grande', onclick: () => conversar(actual.id) }, 'Conversar'),
         pend ? h('button', { class: 'btn plano', onclick: repasar }, `Repasar (${pend})`) : null),
@@ -364,7 +364,7 @@ raiz.VistaIngles = function (ctx) {
         h('div', { style: 'flex:1 1 200px;display:grid;gap:6px' }, h('small', { class: 'tenue' }, e.n ? `Ejercicios: ${Math.round(e.prop * 100)} % de los últimos ${e.n}` : 'Aún no hay ejercicios de esta unidad'), h('div', { class: 'barra' }, h('i', { style: `width:${Math.round(e.prop * 100)}%` }))),
         h('span', { class: 'insignia ' + (e.conversa ? 'bien' : '') }, e.conversa ? 'Conversación hecha' : 'Falta la conversación'),
         h('button', { class: 'btn chico', onclick: () => abrirUnidad(actual.id) }, 'Ver la unidad')));
-    const grupos = ['A1', 'A2', 'B1'].map(nv => h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, NIVEL[nv]),
+    const grupos = ['A1', 'A2', 'B1', 'B2'].map(nv => h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, NIVEL[nv]),
       h('ol', { class: 'temas', start: String(I.unidades.find(u => u.nivel === nv).n) }, ...I.unidades.filter(u => u.nivel === nv).map(u => {
         const x = N.estadoUnidad(P.d, I, u.id), esActual = u === actual;
         return h('li', null, h('button', { class: 'tema' + (x.dominada ? ' hecho' : esActual ? ' actual' : ''), onclick: () => abrirUnidad(u.id) },
@@ -383,7 +383,7 @@ raiz.VistaIngles = function (ctx) {
           h('li', null, 'Lo que fallas vuelve a salir en esa misma sesión, y lo que aciertas vuelve dentro de 1, 3, 7, 16 y 35 días: es el repaso espaciado.'),
           h('li', null, 'Para hablar: escucha primero, repite despacio y después prueba sin mirar. El micrófono te dice qué palabras se entendieron.'),
           h('li', null, `Cada acierto suma ${N.PUNTOS.ingles} puntos (${N.PUNTOS.habla} si lo dices bien en voz alta) y cada fallo resta ${-N.PUNTOS.inglesFallo}.`))));
-    return h('div', { class: 'columna' }, cab, ahora, h('section', { class: 'tarjeta' }, h('h2', null, 'Las 12 unidades'), ...grupos),
+    return h('div', { class: 'columna' }, cab, ahora, h('section', { class: 'tarjeta' }, h('h2', null, `Las ${I.unidades.length} unidades`), ...grupos),
       h('section', { class: 'tarjeta' }, h('details', null, h('summary', null, h('b', null, 'Mensajes de error en inglés que vas a ver')), listaErrores())), ajustes);
   }
 

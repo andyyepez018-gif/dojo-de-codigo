@@ -176,6 +176,25 @@ function celebra(i, texto, o = {}) {
   document.body.append(capa); document.addEventListener('keydown', tecla); boton.focus();
 }
 const miles = n => Number(n).toLocaleString('es-ES');
+/* La hoja de papel: escribir código sin colores ni ayudas, como en papel o en el bloc de notas.
+   Tab pone 4 espacios (para la sangría de Python); Ctrl+Enter comprueba. */
+function hojaPapel({ id, etiqueta, valor = '', bloqueada = false, alCambiar, alComprobar, filas = 8 }) {
+  const ta = h('textarea', { class: 'campo papel', id, rows: String(filas), spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', 'aria-label': etiqueta, disabled: bloqueada || null });
+  ta.value = valor;
+  ta.addEventListener('input', () => alCambiar && alCambiar(ta.value));
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey) { e.preventDefault(); const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + '    ' + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + 4; if (alCambiar) alCambiar(ta.value); }
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && alComprobar) { e.preventDefault(); alComprobar(); }
+  });
+  return ta;
+}
+/* Lo que salió con cada prueba: datos, lo esperado y lo que mostró el programa */
+function listaPruebas(resultados) {
+  return h('div', { class: 'pruebas' }, ...resultados.map(x => h('div', { class: 'prueba ' + (x.ok ? 'si' : 'no') },
+    h('b', null, (x.ok ? '✓ ' : '✗ ') + (x.entradas.length ? 'Con los datos ' + x.entradas.join(', ') : 'Sin datos')),
+    h('span', { class: 'etiqueta' }, 'Debía mostrar'), h('pre', null, x.esperado),
+    !x.ok ? [h('span', { class: 'etiqueta' }, 'Tu programa mostró'), h('pre', null, x.error ? `Error en la línea ${x.error.linea}: ${x.error.message}` : (x.salida || '(nada)'))] : null)));
+}
 
 /* ── Aspecto: sistema / claro / oscuro (respeta lo que diga Claude si se elige «sistema») ── */
 const temaOriginal = document.documentElement.getAttribute('data-theme');
@@ -192,5 +211,5 @@ async function copia(texto) {
   return false;
 }
 
-raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, COLORES_RANGO, emblema, celebra, miles, aplicaAspecto, vibra, copia, reduceMovimiento };
+raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, COLORES_RANGO, emblema, celebra, miles, hojaPapel, listaPruebas, aplicaAspecto, vibra, copia, reduceMovimiento };
 })(window);
