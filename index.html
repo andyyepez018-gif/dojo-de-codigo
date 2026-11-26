@@ -12,7 +12,7 @@
   --ai: #2B4C9B; --ai-fuerte: #1D3778; --ai-suave: #E2E8F7; --sobre-ai: #FFFFFF;
   --kihada: #835400; --kihada-vivo: #D99A12; --kihada-suave: #FBF0D4;
   --bien: #2C7548; --bien-suave: #DFF0E5; --mal: #AE3828; --mal-suave: #F8E2DD;
-  --pizarra: #131B30; --pizarra-borde: #131B30; --pz-texto: #E4E8F4; --pz-tenue: #7F8BAB; --pz-kw: #98B6FF; --pz-str: #F3C677; --pz-num: #F6A486; --pz-fn: #8FE0C0; --pz-com: #6F7B9C; --pz-sel: #22304F;
+  --pizarra: #131B30; --pizarra-borde: #131B30; --pz-texto: #E4E8F4; --pz-tenue: #7F8BAB; --pz-kw: #98B6FF; --pz-str: #F3C677; --pz-num: #F6A486; --pz-fn: #8FE0C0; --pz-com: #8A95B4; --pz-sel: #22304F;
   --f-titulo: "Zen Kaku Gothic New", "Hiragino Sans", "Segoe UI", system-ui, sans-serif;
   --f-texto: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   --f-codigo: "IBM Plex Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
@@ -62,7 +62,7 @@ a { color: var(--ai); }
 .principal { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 110px; min-width: 0; }
 .columna { max-width: 780px; margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
 .pestanas { position: fixed; inset: auto 0 0 0; z-index: 25; background: var(--superficie); border-top: 1px solid var(--linea);
-  display: grid; grid-template-columns: repeat(7, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: grid; grid-template-columns: repeat(8, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .pestanas a, .lateral nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 9px; color: var(--tinta-3); text-decoration: none; font-size: 11.5px; font-weight: 500; }
 .pestanas a[aria-current="page"], .lateral nav a[aria-current="page"] { color: var(--ai); }
@@ -247,6 +247,37 @@ details.desplegable[open] { display: grid; gap: 14px; }
 .pasos-proyecto li.actual { font-weight: 600; }
 .proyecto-tarjeta { border-color: var(--kihada-vivo); }
 .proyecto-tarjeta.hecho { border-color: var(--bien); }
+/* Estudio intensivo */
+.portada-estudio h1 { font-size: clamp(24px, 5vw, 30px); font-weight: 900; }
+.lenguajes-estudio, .accesos-estudio { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 700px) { .lenguajes-estudio, .accesos-estudio { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tarjeta.acceso { text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.tarjeta.acceso:hover { border-color: var(--ai); }
+.tarjeta.acceso b { font: 700 18px/1.2 var(--f-titulo); }
+.tarjeta.acceso .insignia { justify-self: start; }
+.capitulos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.capitulo { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; width: 100%; text-align: left; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--r); padding: 10px 12px; }
+.capitulo:hover { border-color: var(--ai); }
+.capitulo .n { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; font: 700 14px/1 var(--f-titulo); background: var(--hundido); color: var(--tinta-2); }
+.capitulo.leido .n { background: var(--bien); color: var(--sobre-ai); }
+.capitulo .tenue { font-size: 13.5px; }
+.objetivo { background: var(--ai-suave); border-radius: 8px; padding: 10px 12px; }
+.ejemplo-estudio { border-top: 1px solid var(--linea); padding-top: 12px; }
+.nota-ejemplo { font-size: 13.5px; }
+.palabras-estudio { margin: 0; display: grid; grid-template-columns: minmax(110px, max-content) minmax(0, 1fr); gap: 10px 14px; }
+.palabras-estudio dt { font-weight: 600; }
+.palabras-estudio dt code { background: var(--hundido); padding: 2px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+.palabras-estudio dd { margin: 0; display: grid; gap: 2px; justify-items: start; }
+.ejemplo-palabra { font-size: 13px; }
+@media (max-width: 520px) { .palabras-estudio { grid-template-columns: 1fr; gap: 2px; } .palabras-estudio dd { margin-bottom: 10px; } }
+.errores-estudio { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.errores-estudio li { display: grid; gap: 2px; border-left: 3px solid var(--mal); padding-left: 10px; }
+.errores-estudio .arreglo { color: var(--bien); }
+.practica-estudio { border-top: 1px solid var(--linea); padding-top: 12px; }
+.chuleta { width: 100%; border-collapse: collapse; font-size: 14px; }
+.chuleta th { text-align: left; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-3); padding: 6px 8px; border-bottom: 1px solid var(--linea); }
+.chuleta td { padding: 8px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+.chuleta pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; }
 .tres-col { display: grid; gap: 16px; grid-template-columns: 1fr; }
 @media (min-width: 760px) { .tres-col { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .lista.sabe li::marker { color: var(--bien); }
@@ -471,6 +502,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
       <div id="bandas"></div>
       <section id="v-hoy" data-vista="hoy"></section>
       <section id="v-retos" data-vista="retos" hidden></section>
+      <section id="v-estudio" data-vista="estudio" hidden></section>
       <section id="v-ingles" data-vista="ingles" hidden></section>
       <section id="v-habla" data-vista="habla" hidden></section>
       <section id="v-ruta" data-vista="ruta" hidden></section>
@@ -487,6 +519,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="motor.js"></script>
 <script src="contenido.js"></script>
 <script src="escribir.js"></script>
+<script src="estudio.js"></script>
 <script src="ingles.js"></script>
 <script src="habla.js"></script>
 <script src="nucleo.js"></script>
@@ -495,5 +528,6 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="voz.js"></script>
 <script src="vista-ingles.js"></script>
 <script src="vista-habla.js"></script>
+<script src="vista-estudio.js"></script>
 <script src="vista-examen.js"></script>
 <script src="app.js"></script>

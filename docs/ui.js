@@ -102,7 +102,7 @@ function bloqueCodigo(codigo, lang, opts = {}) {
   });
   if (opts.tocar) { ol.setAttribute('role', 'listbox'); ol.setAttribute('aria-label', 'Líneas del programa'); }
   // tabindex: si el código es más ancho que la pantalla, se puede desplazar también con el teclado
-  return h('div', { class: 'codigo', role: opts.tocar ? 'group' : 'region', tabindex: opts.tocar ? null : '0', 'aria-label': 'Código en ' + (NL[lang] || lang) }, ol);
+  return h('div', { class: 'codigo', role: 'group', tabindex: opts.tocar ? null : '0', 'aria-label': 'Código en ' + (NL[lang] || lang) }, ol);
 }
 const salidaBloque = s => s === '' ? h('div', { class: 'salida vacia' }, '(no muestra nada)') : h('div', { class: 'salida' }, s);
 

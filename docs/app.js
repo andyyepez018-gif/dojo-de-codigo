@@ -131,19 +131,20 @@ function escaleraRangos() {
 const ICONOS = {
   hoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   retos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  estudio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5C4.5 4 7.5 4 12 6c4.5-2 7.5-2 10-.5V19c-2.5-1.5-5.5-1.5-10 .5-4.5-2-7.5-2-10-.5z"/><path d="M12 6v13.5"/></svg>',
   habla: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="m9 9-2 2 2 2M15 9l2 2-2 2"/></svg>',
   ingles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L3 21l1.5-5.2A8.5 8.5 0 1 1 21 12z"/><path d="M8 15.5 10.3 8.5h.4l2.3 7M8.8 13.3h3.4M14.8 10h3"/></svg>',
   ruta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></svg>',
   lab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>',
   plan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>'
 };
-const VISTAS = [['hoy', 'Hoy'], ['retos', 'Retos'], ['ingles', 'Inglés'], ['habla', 'Habla'], ['ruta', 'Ruta'], ['lab', 'Laboratorio'], ['plan', 'Plan']];
+const VISTAS = [['hoy', 'Hoy'], ['retos', 'Retos'], ['estudio', 'Estudio'], ['ingles', 'Inglés'], ['habla', 'Habla'], ['ruta', 'Ruta'], ['lab', 'Laboratorio'], ['plan', 'Plan']];
 let vista = 'hoy';
 function pintaMenus() {
   for (const id of ['menu-lateral', 'menu-pestanas']) {
     const el = $('#' + id); el.textContent = '';
     for (const [v, n] of VISTAS) el.append(h('a', { href: '#' + v, 'aria-current': v === vista ? 'page' : null, html: ICONOS[v] + `<span>${n === 'Laboratorio' && id === 'menu-pestanas' ? 'Lab' : n}</span>`,
-      onclick: e => { if (v === 'lab') lab.modo = 'editar'; if (v === 'ruta') temaAbierto = null; if (v === 'ingles') VI.inicio(); if (v === 'habla') VH.inicio(); if (location.hash === '#' + v) { e.preventDefault(); mostrar(v, true); } } }));
+      onclick: e => { if (v === 'lab') lab.modo = 'editar'; if (v === 'ruta') temaAbierto = null; if (v === 'ingles') VI.inicio(); if (v === 'habla') VH.inicio(); if (v === 'estudio') VS.inicio(); if (location.hash === '#' + v) { e.preventDefault(); mostrar(v, true); } } }));
   }
 }
 function ir(v) { if (location.hash !== '#' + v) location.hash = v; else mostrar(v); }
@@ -566,7 +567,12 @@ const NO_PREGUNTAR = new Set(['cout', 'cin', 'endl', 'std', 'main', 'string', 'i
 const COMENTARIOS = ['calcula el total', 'pide los datos', 'muestra el resultado', 'empieza el programa', 'comprueba el valor'];
 const CLASE_CAT = { com: 'com', dir: 'kw ctl', str: 'str', nu: 'nu', ctl: 'kw ctl', kw: 'kw', fn: 'fn', var: 'var' };
 function generaPieza(temaId, lang) {
-  const cands = D.plantillas.filter(t => t.tema === temaId && D.langsDe(t).includes(lang)); if (!cands.length) return null;
+  // se prueba con varios programas del tema (y si no, de cualquier tema) hasta que haya al menos dos clases de pieza
+  for (let k = 0; k < 12; k++) { const r = intentaPieza(k < 8 ? temaId : null, lang); if (r) return r; }
+  return null;
+}
+function intentaPieza(temaId, lang) {
+  const cands = D.plantillas.filter(t => (!temaId || t.tema === temaId) && D.langsDe(t).includes(lang)); if (!cands.length) return null;
   const t = azar(cands); let base = null; try { base = D.generar({ tpl: t.id, lang, tipo: 'salida', seed: semilla() }); } catch (e) { base = null; } if (!base) return null;
   let codigo = base.codigo;
   if (Math.random() < 0.3) codigo = (lang === 'py' ? '# ' : '// ') + azar(COMENTARIOS) + '\n' + codigo;
@@ -577,7 +583,7 @@ function generaPieza(temaId, lang) {
   const otras = Object.keys(CATEGORIAS).filter(c => c !== cat).sort(() => Math.random() - 0.5).slice(0, 3);
   const ops = [cat, ...otras].sort(() => Math.random() - 0.5);
   const aciertos = ls.get('pieza-aciertos', 0);
-  return { tipo: 'pieza', tema: temaId, lang, codigo, lineas: ls_, sitio, cat, ops, opciones: ops.map(c => CATEGORIAS[c].n), correcta: ops.indexOf(cat), sinColor: aciertos >= 5 && Math.random() < 0.5, spec: {}, entradas: [], token: ls_[sitio.i][sitio.k].t.trim() };
+  return { tipo: 'pieza', tema: t.tema, lang, codigo, lineas: ls_, sitio, cat, ops, opciones: ops.map(c => CATEGORIAS[c].n), correcta: ops.indexOf(cat), sinColor: aciertos >= 5 && Math.random() < 0.5, spec: {}, entradas: [], token: ls_[sitio.i][sitio.k].t.trim() };
 }
 function codigoConMarca(r) {
   const ol = h('ol');
@@ -1172,6 +1178,8 @@ function tarjetaPrivacidad() {
 
 /* ───────────── INGLÉS (vista-ingles.js) ───────────── */
 const VE = window.VistaExamen({ P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista: () => vista });
+const VS = window.VistaEstudio({ D, G: window.Estudio, W, M, U, ir, aviso, abrirLab, vista: () => vista });
+PINTA.estudio = () => VS.pinta();
 const VH = window.VistaHabla({ P, N, J, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, vista: () => vista });
 PINTA.habla = () => VH.pinta();
 PINTA.examen = () => VE.pinta();

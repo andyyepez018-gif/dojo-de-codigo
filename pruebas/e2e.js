@@ -459,10 +459,44 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   ok('una hora: bloque de foco de 60 minutos con la lección abierta', /^(60|59):/.test(await p.textContent('#reloj-foco')) && await p.locator('#v-ruta').isVisible(), [await p.textContent('#reloj-foco'), await p.evaluate(() => location.hash)]);
   await c.close();
 
+  console.log('18. Estudio intensivo: guía desde cero, laboratorio libre, diccionario, chuleta y prueba, sin puntos');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 777 }));
+  const puntosAhora = () => p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).puntos);
+  await p.goto(URL + '#estudio'); await p.waitForSelector('.lenguajes-estudio');
+  ok('Estudio está en el menú y ofrece los tres lenguajes', await p.locator('#menu-lateral a[href="#estudio"]').count() === 1 && await p.locator('.lenguaje-estudio').count() === 3);
+  await p.locator('.lenguaje-estudio', { hasText: 'PSeInt' }).click(); await p.waitForSelector('.capitulos');
+  ok('la guía de PSeInt tiene 12 capítulos', await p.locator('.capitulo').count() === 12);
+  await p.getByRole('button', { name: 'Empezar desde cero' }).click(); await p.waitForSelector('.objetivo');
+  ok('empieza desde cero: qué es programar', /Qué es programar/.test(await p.textContent('#v-estudio h1')));
+  await p.locator('.ejemplo-estudio').first().getByRole('button', { name: '▶ Ejecutar' }).click();
+  ok('los ejemplos se ejecutan ahí mismo', /Hola, mundo/.test(await p.textContent('.ejemplo-estudio')));
+  await p.screenshot({ path: path.join(CAPTURAS, '30-estudio-capitulo.png'), fullPage: true });
+  await p.getByRole('button', { name: /Mostrar en pantalla: Escribir →/ }).click(); await p.waitForSelector('.palabras-estudio');
+  ok('cada capítulo explica sus palabras y errores típicos', /Sin Saltar/.test(await p.textContent('.palabras-estudio')) && await p.locator('.errores-estudio li').count() >= 2);
+  const t = W.tareas.find(x => x.tema === 'salida');
+  await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
+  ok('practicar escribiendo: se corrige', /Funciona/.test(await p.textContent('.practica-estudio')));
+  await p.getByRole('button', { name: /← Guía de PSeInt/ }).first().click(); await p.locator('.acceso', { hasText: 'Diccionario' }).click(); await p.waitForSelector('#dic-busca');
+  await p.fill('#dic-busca', 'leer');
+  ok('el diccionario busca palabras', /Espera a que el usuario escriba/.test(await p.textContent('.palabras-estudio')));
+  await p.getByRole('button', { name: /← Guía de PSeInt/ }).first().click(); await p.locator('.acceso', { hasText: 'Chuleta' }).click();
+  ok('la chuleta resume todo', await p.locator('.chuleta tbody tr').count() >= 10);
+  await p.getByRole('button', { name: /← Guía de PSeInt/ }).first().click(); await p.locator('.acceso', { hasText: 'Ponte a prueba' }).click(); await p.waitForSelector('.reto');
+  for (let k = 0; k < 10; k++) { await p.locator('#v-estudio .opcion').first().click(); await p.click('#est-siguiente'); }
+  ok('la prueba sin puntos da un resultado', / de 10/.test(await p.textContent('#v-estudio h1')));
+  await p.getByRole('button', { name: 'Volver a la guía' }).click(); await p.getByRole('button', { name: 'Laboratorio libre' }).click(); await p.waitForSelector('#estudio-editor');
+  await p.fill('#estudio-editor', 'Leer n\nEscribir n * 3'); await p.fill('#estudio-datos', '7'); await p.click('#estudio-ejecutar');
+  ok('el laboratorio libre ejecuta con datos', /21/.test(await p.textContent('#estudio-consola')));
+  await p.fill('#estudio-editor', 'Escribir "sin cerrar'); await p.click('#estudio-ejecutar');
+  ok('y explica los errores', /Error en la línea 1/.test(await p.textContent('#estudio-consola')));
+  ok('nada de lo estudiado cambia los puntos', await puntosAhora() === 777);
+  await p.screenshot({ path: path.join(CAPTURAS, '31-estudio-lab.png') });
+  await c.close();
+
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');
   for (const esquema of ['light', 'dark']) {
     ({ c, p } = await nueva(b, { ...devices['iPhone 13'], colorScheme: esquema }, { v: 2, bienvenida: true }));
-    for (const v of ['hoy', 'retos', 'ingles', 'habla', 'ruta', 'lab', 'plan', 'examen']) {
+    for (const v of ['hoy', 'retos', 'estudio', 'ingles', 'habla', 'ruta', 'lab', 'plan', 'examen']) {
       await p.goto(URL + '#' + v); await pausa(250);
       ok(`móvil ${esquema} · ${v} sin desbordar`, await sinDesbordar(p));
       if (esquema === 'dark' && (v === 'hoy' || v === 'retos' || v === 'lab' || v === 'ingles')) await p.screenshot({ path: path.join(CAPTURAS, `08-movil-${v}.png`) });

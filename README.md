@@ -10,6 +10,11 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 
 ## Qué hace
 
+- **Estudio intensivo (sin puntos):** una guía completa de PSeInt, Python y C++ desde cero, de 12
+  capítulos cada una (qué es programar, mostrar, variables, operaciones, pedir datos, decisiones, bucles,
+  arreglos, funciones, texto y errores típicos), con 105 ejemplos que se ejecutan ahí mismo, 156 palabras
+  explicadas una a una, errores típicos por capítulo, práctica de escribir, diccionario con buscador,
+  chuleta para la evaluación, una prueba de 10 preguntas y un laboratorio libre. No da ni quita puntos.
 - **¿Cuánto tiempo tienes?** La portada ofrece una sesión de 5 minutos (retos y repasos), de 20 (retos,
   inglés y habla, con una barra que cuenta cada parte) o una hora (bloque de foco con la lección o el
   proyecto). Y aparte, el modo para las esperas de Claude.
@@ -72,6 +77,7 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 | `ingles.js` | El curso de inglés: 14 unidades, mensajes de error, comparadores tolerantes (mayúsculas, signos, contracciones, números) y el generador de ejercicios. |
 | `nucleo.js` | Lógica sin pantalla: progreso (con validación y migración), puntos y rangos, repaso espaciado, inglés, racha, recomendaciones. |
 | `ui.js` | Piezas visuales: resaltado, editor con colores, cinturones, insignias de rango, celebración, aspecto claro/oscuro. |
+| `estudio.js`, `vista-estudio.js` | Las guías de estudio intensivo de los tres lenguajes y su pantalla. |
 | `escribir.js` | Las tareas de escribir y los proyectos de cada rango, con pruebas y soluciones en los tres lenguajes. |
 | `habla.js` | Habla de programador: los 6 bloques de términos y situaciones y su generador de ejercicios. |
 | `vista-habla.js`, `vista-examen.js` | Las pantallas de Habla y del examen de ascenso (con su repaso). |
@@ -93,6 +99,7 @@ node pruebas/motor.test.js        # 119 programas y errores típicos en los tres
 node pruebas/contenido.test.js    # miles de retos generados y comprobados con el motor
 node pruebas/soluciones.test.js   # los 20 ejercicios resueltos en los tres lenguajes
 node pruebas/ingles.test.js       # el curso de inglés: contenido, comparadores y miles de ejercicios
+node pruebas/estudio.test.js      # cada ejemplo de las tres guías se ejecuta sin errores
 node pruebas/escribir.test.js     # cada tarea y cada paso de proyecto, resueltos y comprobados en los tres lenguajes
 node pruebas/habla.test.js        # habla de programador: términos, situaciones y ejercicios
 node pruebas/nucleo.test.js       # progreso, migración, rangos y exámenes, repaso espaciado, inglés y habla

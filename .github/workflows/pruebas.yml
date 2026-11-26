@@ -23,6 +23,8 @@ jobs:
         run: node pruebas/soluciones.test.js
       - name: Escribir código (tareas y proyectos resueltos en los tres lenguajes)
         run: node pruebas/escribir.test.js
+      - name: Guías de estudio (cada ejemplo se ejecuta)
+        run: node pruebas/estudio.test.js
       - name: Inglés (contenido, comparadores y miles de ejercicios generados)
         run: node pruebas/ingles.test.js
       - name: Habla de programador (términos y situaciones)
