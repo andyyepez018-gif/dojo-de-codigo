@@ -62,7 +62,7 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 |---|---|
 | `motor.js` | El intérprete: lo de un primer curso de PSeInt, Python (listas, diccionarios, comprensiones) y C++ (vector, string, `setprecision`). Errores y avisos en español, registro paso a paso. |
 | `contenido.js` | Las 10 lecciones, los 20 ejercicios, las 44 plantillas de retos y la rama de HTML. |
-| `ingles.js` | El curso de inglés: 12 unidades, mensajes de error, comparadores tolerantes (mayúsculas, signos, contracciones, números) y el generador de ejercicios. |
+| `ingles.js` | El curso de inglés: 14 unidades, mensajes de error, comparadores tolerantes (mayúsculas, signos, contracciones, números) y el generador de ejercicios. |
 | `nucleo.js` | Lógica sin pantalla: progreso (con validación y migración), puntos y rangos, repaso espaciado, inglés, racha, recomendaciones. |
 | `ui.js` | Piezas visuales: resaltado, editor con colores, cinturones, insignias de rango, celebración, aspecto claro/oscuro. |
 | `escribir.js` | Las tareas de escribir y los proyectos de cada rango, con pruebas y soluciones en los tres lenguajes. |
