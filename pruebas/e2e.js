@@ -361,7 +361,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
 
   console.log('15. Escribir código: completar líneas, escribir desde cero y el proyecto del rango');
   const W = require('../escribir.js');
-  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 320, examenes: {}, ajustes: { lang: 'py' },
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 2000, examenes: {}, ajustes: { lang: 'py' },
     temas: { salida: { ultimos: [1, 1, 1, 1, 1, 1, 1, 1], intentos: 8, aciertos: 8 } } }, modoPruebas));
   await p.goto(URL + '#retos'); await p.waitForSelector('.reto');
   // forzar los dos tipos de escritura: se busca hasta que salgan (en el tema 1 dominado salen a menudo)
