@@ -97,11 +97,11 @@ const salidaBloque = s => s === '' ? h('div', { class: 'salida vacia' }, '(no mu
 /* ── Editor con colores: un textarea transparente encima del código pintado ── */
 const ABRE = { py: /:\s*(#.*)?$/, cpp: /\{\s*$/, ps: /(\bEntonces|\bHacer|^\s*Repetir|^\s*SiNo|^\s*Algoritmo\b.*|^\s*(Funcion|SubProceso)\b.*|:)\s*$/i, html: /<(ul|ol|div|section|body|head|style|table|tr)[^>]*>\s*$/i };
 const COMENTARIO = { py: '# ', cpp: '// ', ps: '// ' };
-function editor({ valor, lang, alCambiar, alEjecutar, etiqueta }) {
+function editor({ valor, lang, alCambiar, alEjecutar, etiqueta, id }) {
   const nums = h('div', { class: 'numeros', 'aria-hidden': 'true' });
   const pintado = h('pre', { class: 'pintado', 'aria-hidden': 'true' });
   const banda = h('div', { class: 'banda-error', hidden: true });
-  const ta = h('textarea', { id: 'editor-codigo', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', 'aria-label': etiqueta || ('Tu código en ' + (NL[lang] || lang)), wrap: 'off' });
+  const ta = h('textarea', { id: id || 'editor-codigo', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', 'aria-label': etiqueta || ('Tu código en ' + (NL[lang] || lang)), wrap: 'off' });
   ta.value = valor; let marcada = 0;
   const pinta = () => {
     const ls_ = ta.value.split('\n');
@@ -176,17 +176,40 @@ function celebra(i, texto, o = {}) {
   document.body.append(capa); document.addEventListener('keydown', tecla); boton.focus();
 }
 const miles = n => Number(n).toLocaleString('es-ES');
-/* La hoja de papel: escribir código sin colores ni ayudas, como en papel o en el bloc de notas.
-   Tab pone 4 espacios (para la sangría de Python); Ctrl+Enter comprueba. */
-function hojaPapel({ id, etiqueta, valor = '', bloqueada = false, alCambiar, alComprobar, filas = 8 }) {
+/* La hoja para escribir código: el editor con colores (sin autocompletar ni pistas). Con un toque se quitan
+   los colores y queda como el bloc de notas, para practicar sin nada. Tab pone 4 espacios; Ctrl+Enter comprueba. */
+function hojaPlana({ id, etiqueta, valor, bloqueada, alCambiar, alComprobar, filas }) {
   const ta = h('textarea', { class: 'campo papel', id, rows: String(filas), spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', 'aria-label': etiqueta, disabled: bloqueada || null });
   ta.value = valor;
-  ta.addEventListener('input', () => alCambiar && alCambiar(ta.value));
+  ta.addEventListener('input', () => alCambiar(ta.value));
   ta.addEventListener('keydown', e => {
-    if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey) { e.preventDefault(); const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + '    ' + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + 4; if (alCambiar) alCambiar(ta.value); }
+    if (e.key === 'Tab' && !e.shiftKey && !e.altKey && !e.ctrlKey) { e.preventDefault(); const a = ta.selectionStart, b = ta.selectionEnd; ta.value = ta.value.slice(0, a) + '    ' + ta.value.slice(b); ta.selectionStart = ta.selectionEnd = a + 4; alCambiar(ta.value); }
     else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && alComprobar) { e.preventDefault(); alComprobar(); }
   });
   return ta;
+}
+function hojaPapel({ id, etiqueta, valor = '', bloqueada = false, alCambiar, alComprobar, filas = 8, lang }) {
+  const caja = h('div', { class: 'hoja' }); let actual = valor;
+  const cambia = v => { actual = v; if (alCambiar) alCambiar(v); };
+  const pon = enfocar => {
+    caja.textContent = '';
+    const colores = !!lang && ls.get('hoja-colores', true);
+    let campo;
+    if (colores) {
+      const ed = editor({ id, valor: actual, lang, etiqueta, alCambiar: cambia, alEjecutar: alComprobar });
+      if (bloqueada) ed.ta.disabled = true;
+      ed.el.style.setProperty('--filas', String(filas)); campo = ed.el;
+    } else campo = hojaPlana({ id, etiqueta, valor: actual, bloqueada, alCambiar: cambia, alComprobar, filas });
+    caja.append(campo);
+    // Qué significa cada color: en los editores de verdad (VS Code, PyCharm…) cada color marca un tipo de pieza
+    if (colores) caja.append(h('p', { class: 'leyenda-colores', 'aria-label': 'Qué significa cada color' },
+      h('span', { class: 'kw' }, 'palabras clave'), h('span', { class: 'str' }, '"textos"'), h('span', { class: 'nu' }, 'números'), h('span', { class: 'fn' }, 'funciones()'), h('span', { class: 'com' }, 'comentarios')));
+    if (lang && !bloqueada) caja.append(h('div', { class: 'fila', style: 'justify-content:flex-end' }, h('button', { class: 'btn plano chico', type: 'button', 'aria-pressed': String(!colores),
+      onclick: () => { ls.set('hoja-colores', !colores); pon(true); } }, colores ? 'Quitar colores (como el bloc de notas)' : 'Poner colores')));
+    if (enfocar) { const t = caja.querySelector('textarea'); if (t) t.focus(); }
+  };
+  pon(false);
+  return caja;
 }
 /* Lo que salió con cada prueba: datos, lo esperado y lo que mostró el programa */
 function listaPruebas(resultados) {

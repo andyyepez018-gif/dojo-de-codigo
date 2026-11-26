@@ -481,8 +481,8 @@ function cuerpoReto() {
   } else if (r.tipo === 'escribe') {
     const t = r.tarea;
     partes.push(h('h2', null, `Escríbelo en ${NL[l]}`), h('p', { class: 'enunciado' }, t.enunciado),
-      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco, como en papel: sin colores ni ayudas. Se comprobará con varios datos distintos.' + (l === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')),
-      hojaPapel('hoja-escribe', `Tu programa en ${NL[l]}`, respondido, () => compruebaEscrito()));
+      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco: sin autocompletar ni pistas, como si lo escribieras en papel o en el bloc de notas. Se comprobará con varios datos distintos.' + (l === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')),
+      hojaPapel('hoja-escribe', `Tu programa en ${NL[l]}`, respondido, () => compruebaEscrito(), l));
     if (!respondido) partes.push(h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: compruebaEscrito }, 'Comprobar'), h('span', { class: 'atajos' }, 'Tab pone 4 espacios · Ctrl+Enter comprueba')));
   } else if (r.tipo === 'traducir') {
     partes.push(h('h2', null, `¿Cuál es este programa en ${NL[l]}?`), h('span', { class: 'etiqueta' }, 'En ' + NL[r.origen]), bloqueCodigo(r.codigoOrigen, r.origen), chipsEntradas());
@@ -498,7 +498,7 @@ function cuerpoReto() {
 }
 /* Escribir: lo escrito se guarda por reto (si la pantalla se repinta, no se pierde) */
 let escrito = {};
-const hojaPapel = (id, etiqueta, bloqueada, alComprobar) => U.hojaPapel({ id, etiqueta, bloqueada, valor: escrito[id] || '', alCambiar: v => { escrito[id] = v; }, alComprobar });
+const hojaPapel = (id, etiqueta, bloqueada, alComprobar, lang) => U.hojaPapel({ id, etiqueta, bloqueada, lang, valor: escrito[id] || '', alCambiar: v => { escrito[id] = v; }, alComprobar });
 let resultadoEscrito = null;
 function compruebaLinea(valor) {
   if (respondido || !reto) return;

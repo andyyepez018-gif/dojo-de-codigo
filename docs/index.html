@@ -246,6 +246,10 @@ details.desplegable[open] { display: grid; gap: 14px; }
   background: var(--superficie) repeating-linear-gradient(transparent 0, transparent calc(1.7em - 1px), var(--linea) calc(1.7em - 1px), var(--linea) 1.7em); background-position: 0 10px; }
 @media (pointer: coarse) { .campo.papel { font-size: 16px; } }
 .linea-escrita { width: 100%; font-size: 15px; }
+.hoja { display: grid; gap: 4px; min-width: 0; }
+.leyenda-colores { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12.5px/1.4 var(--f-codigo); background: var(--pizarra); border-radius: 8px; padding: 6px 10px; margin: 0; }
+.leyenda-colores .kw { color: var(--pz-kw); } .leyenda-colores .str { color: var(--pz-str); } .leyenda-colores .nu { color: var(--pz-num); } .leyenda-colores .fn { color: var(--pz-fn); } .leyenda-colores .com { color: var(--pz-com); font-style: italic; }
+.hoja .editor textarea { min-height: calc(var(--filas, 8) * var(--ed) * 1.6 + 24px); }
 .enunciado { white-space: pre-wrap; font-size: 16px; background: var(--hundido); border-radius: 8px; padding: 10px 12px; }
 .pasos-proyecto { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
 .pasos-proyecto li.hecho { color: var(--bien); }

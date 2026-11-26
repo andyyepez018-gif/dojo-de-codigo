@@ -102,7 +102,7 @@ raiz.VistaExamen = function (ctx) {
     return g;
   }
   function entradas(r) { return r.entradas && r.entradas.length ? h('p', { class: 'fila' }, h('span', { class: 'tenue' }, 'El usuario escribe:'), ...r.entradas.map(e => h('span', { class: 'insignia ai mono' }, e))) : null; }
-  /* Escribir en el examen: una hoja en blanco (o una línea), sin colores, sin pistas */
+  /* Escribir en el examen: una hoja en blanco (o una línea), con colores pero sin autocompletar ni pistas */
   function campoLinea(r) {
     const c = h('input', { class: 'campo mono linea-escrita', id: 'ex-linea', type: 'text', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', 'aria-label': `La línea ${r.linea + 1}, escrita por ti`, placeholder: `Línea ${r.linea + 1}`,
       oninput: () => { st.resp = c.value.trim() ? c.value : null; const b = $('#ex-siguiente'); if (b) b.disabled = !st.resp; },
@@ -110,11 +110,11 @@ raiz.VistaExamen = function (ctx) {
     c.value = st.resp || ''; return c;
   }
   function cuerpoEscribe(q) {
-    const hoja = U.hojaPapel({ id: 'ex-hoja', etiqueta: `Tu programa en ${NL[q.lang]}`, valor: st.resp || '', filas: 9,
+    const hoja = U.hojaPapel({ id: 'ex-hoja', etiqueta: `Tu programa en ${NL[q.lang]}`, valor: st.resp || '', filas: 9, lang: q.lang,
       alCambiar: v => { st.resp = v.trim() ? v : null; const b = $('#ex-siguiente'); if (b) b.disabled = !st.resp; },
       alComprobar: () => { if (st.resp) { if (st.fase === 'repaso') corrigeRepaso(); else siguiente(); } } });
     return [h('h2', null, `Escríbelo en ${NL[q.lang]}`), h('p', { class: 'enunciado' }, q.tarea.enunciado),
-      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco: sin colores ni ayudas. Se comprobará con varios datos.' + (q.lang === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')), hoja];
+      h('p', { class: 'tenue', style: 'font-size:13px' }, 'Hoja en blanco: sin autocompletar ni pistas. Se comprobará con varios datos.' + (q.lang === 'cpp' ? ' En C++ basta con lo de dentro de main.' : '')), hoja];
   }
   function cuerpoCodigo(r) {
     const l = r.lang;
@@ -246,7 +246,7 @@ raiz.VistaExamen = function (ctx) {
         h('div', { class: 'cabeza-rango' }, U.emblema(ex.rango, 58, ex.nombre), h('div', { class: 'pila', style: 'gap:2px' }, h('span', { class: 'etiqueta' }, `Examen de ascenso · rango ${ex.rango + 1} de ${N.RANGOS.length}`), h('h1', null, ex.nombre), h('span', { class: 'tenue' }, N.RANGOS[ex.rango].lema))),
         h('ul', { class: 'lista' },
           h('li', null, h('b', null, `${ex.preguntas} preguntas`), ` mezcladas: código (leer y escribir, en PSeInt, Python y C++), inglés y habla de programador.`),
-          h('li', null, h('b', null, 'Escribir de verdad: '), `${ex.rango <= 2 ? 'un programa' : 'dos programas'} desde cero y alguna línea que falta, sin colores ni ayudas, como en papel.`),
+          h('li', null, h('b', null, 'Escribir de verdad: '), `${ex.rango <= 2 ? 'un programa' : 'dos programas'} desde cero y alguna línea que falta, sin autocompletar ni pistas: como si fuera en papel o en el bloc de notas.`),
           h('li', null, h('b', null, `Para aprobar: el ${Math.round(ex.nota * 100)} %`), ` (${Math.ceil(ex.preguntas * ex.nota)} bien como mínimo).`),
           h('li', null, h('b', null, 'Sin ninguna ayuda: '), 'ni tutor, ni pistas, ni pronunciación escrita, ni paso a paso. No sabrás si aciertas hasta el final.'),
           h('li', null, h('b', null, 'Sin salir: '), 'si cambias de pantalla o cierras la app, cuenta como suspendido.'),
@@ -289,7 +289,7 @@ raiz.VistaExamen = function (ctx) {
         h('h2', null, `Paso ${x.paso + 1}`), h('p', { class: 'enunciado' }, paso.enunciado),
         h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Lenguaje'), chipsLang(l, nl => { st.langEsc = nl; ls.set('lang-escribir', nl); x.res = null; pinta(); }, 'Lenguaje del proyecto')),
         h('p', { class: 'tenue', style: 'font-size:13px' }, 'Escríbelo aquí como en papel (o primero en papel de verdad, y luego pásalo). Lo que escribes se guarda: cada paso sigue al anterior.' + (l === 'cpp' ? ' En C++ basta con lo de dentro de main (y las funciones arriba).' : '')),
-        U.hojaPapel({ id: 'proyecto-hoja', etiqueta: `Tu proyecto en ${NL[l]}`, filas: 14, valor: ls.get(claveCodigo(st.k, l), '') || '', alCambiar: v => ls.set(claveCodigo(st.k, l), v), alComprobar: compruebaPaso }),
+        U.hojaPapel({ id: 'proyecto-hoja', etiqueta: `Tu proyecto en ${NL[l]}`, filas: 14, lang: l, valor: ls.get(claveCodigo(st.k, l), '') || '', alCambiar: v => ls.set(claveCodigo(st.k, l), v), alComprobar: compruebaPaso }),
         h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'proy-comprobar', onclick: compruebaPaso }, 'Comprobar este paso'), h('span', { class: 'atajos' }, 'Tab pone 4 espacios · Ctrl+Enter comprueba')),
         res ? h('div', { class: 'respuesta ' + (res.ok ? 'si' : 'no'), role: 'status' },
           h('div', { class: 'entre' }, h('h3', null, res.ok ? (res.reg.terminado ? '¡Proyecto terminado!' : `Paso ${x.paso + 1} hecho`) : 'Todavía no'), chipPuntos(res.reg)),

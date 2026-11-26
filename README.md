@@ -21,8 +21,8 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
   se puede detener), consola que pide datos, avisos de fallos típicos y **paso a paso** con las
   variables, la función en curso y la salida de cada momento. Rama extra de HTML con vista previa.
 - **Escribir código, no solo reconocerlo:** «Escribe la línea que falta» (sin opciones) y «Escríbelo tú»
-  (20 tareas, 2 por tema, en una hoja en blanco sin colores ni ayudas, como en papel o en el bloc de
-  notas; se corrige ejecutándolo con varios datos, así que copiar la salida no vale). Al empezar un tema
+  (20 tareas, 2 por tema, en una hoja en blanco con colores pero sin autocompletar ni pistas, como si fuera
+  en papel o en el bloc de notas, y un botón para quitar los colores; se corrige ejecutándolo con varios datos, así que copiar la salida no vale). Al empezar un tema
   solo se lee; luego una cuarta parte de los retos son de escribir y, al dominarlo, el 40 %.
 - **Proyecto guiado por rango:** 9 proyectos (de la ficha de programador al analizador de texto), en 3
   pasos que se construyen uno sobre otro; hay que terminarlo para poder hacer el examen del rango.
