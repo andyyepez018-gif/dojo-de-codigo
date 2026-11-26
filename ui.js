@@ -41,7 +41,13 @@ const KW = {
 const FN = {
   ps: new Set('raiz rc abs trunc redon azar aleatorio longitud mayusculas minusculas subcadena concatenar convertiranumero convertiratexto'.split(' ')),
   py: new Set('print input int float str len range abs round max min sum sorted list dict type enumerate reversed'.split(' ')),
-  cpp: new Set('cout cin endl getline sqrt pow abs max min to_string stoi stod setprecision setw fixed main'.split(' '))
+  cpp: new Set('endl getline sqrt pow abs max min to_string stoi stod setprecision setw fixed main'.split(' '))
+};
+/* Palabras de control (deciden por dónde sigue el programa): VS Code las pinta de otro color (morado) */
+const CTL = {
+  ps: new Set('si entonces sino finsi mientras hacer finmientras para hasta con paso finpara repetir que segun finsegun caso de otro modo'.split(' ')),
+  py: new Set('if elif else while for in return break continue pass'.split(' ')),
+  cpp: new Set('if else while for do return break continue switch case default'.split(' '))
 };
 const normaliza = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const RE = {
@@ -49,6 +55,26 @@ const RE = {
   otro: /(\/\/.*$|^\s*#.*$)|("(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_À-ſ][\wÀ-ſ]*)/g,
   html: /(<!--.*?(?:-->|$))|(<\/?[A-Za-z][\w-]*)|("[^"]*"?|'[^']*'?)|([\w-]+(?==))|(\/?>)/g
 };
+/* Trocea una línea en piezas con su categoría: com (comentario), dir (#include), str (texto), nu (número),
+   ctl (palabra de control), kw (otra palabra clave), fn (función), var (variable) o '' (lo demás: signos, espacios) */
+function piezas(linea, lang) {
+  const re = new RegExp((lang === 'py' ? RE.py : RE.otro).source, 'g'), out = []; let ult = 0, m;
+  const mas = (t, c) => { if (t) out.push({ t, c }); };
+  while ((m = re.exec(linea))) {
+    mas(linea.slice(ult, m.index), ''); ult = re.lastIndex;
+    if (m[1]) mas(m[1], m[1].trimStart().startsWith('#') && lang !== 'py' ? 'dir' : 'com');
+    else if (m[2]) mas(m[2], 'str');
+    else if (m[3]) mas(m[3], 'nu');
+    else if (m[4]) {
+      const w = m[4], k = lang === 'ps' ? normaliza(w) : w;
+      mas(w, CTL[lang] && CTL[lang].has(k) ? 'ctl' : KW[lang] && KW[lang].has(k) ? 'kw' : (FN[lang] && FN[lang].has(k)) || /^\s*\(/.test(linea.slice(ult)) ? 'fn' : 'var');
+    }
+    if (m[0] === '') re.lastIndex++;
+  }
+  mas(linea.slice(ult), '');
+  return out;
+}
+const CLASE = { com: 'com', dir: 'kw ctl', str: 'str', nu: 'nu', ctl: 'kw ctl', kw: 'kw', fn: 'fn', var: 'var', '': '' };
 function resalta(linea, lang) {
   if (lang === 'html') {
     const re = new RegExp(RE.html.source, 'g'); let out = '', ult = 0, m;
@@ -59,22 +85,7 @@ function resalta(linea, lang) {
     }
     return out + esc(linea.slice(ult));
   }
-  const re = new RegExp((lang === 'py' ? RE.py : RE.otro).source, 'g');
-  let out = '', ult = 0, m;
-  while ((m = re.exec(linea))) {
-    out += esc(linea.slice(ult, m.index)); ult = re.lastIndex;
-    if (m[1]) out += m[1].trimStart().startsWith('#') && lang !== 'py' ? `<span class="kw">${esc(m[1])}</span>` : `<span class="com">${esc(m[1])}</span>`;
-    else if (m[2]) out += `<span class="str">${esc(m[2])}</span>`;
-    else if (m[3]) out += `<span class="nu">${m[3]}</span>`;
-    else {
-      const w = m[4], k = lang === 'ps' ? normaliza(w) : w;
-      if (KW[lang] && KW[lang].has(k)) out += `<span class="kw">${esc(w)}</span>`;
-      else if ((FN[lang] && FN[lang].has(k)) || /^\s*\(/.test(linea.slice(ult))) out += `<span class="fn">${esc(w)}</span>`;
-      else out += esc(w);
-    }
-    if (m[0] === '') re.lastIndex++;
-  }
-  return out + esc(linea.slice(ult));
+  return piezas(linea, lang).map(x => (CLASE[x.c] ? `<span class="${CLASE[x.c]}">${esc(x.t)}</span>` : esc(x.t))).join('');
 }
 function bloqueCodigo(codigo, lang, opts = {}) {
   const ol = h('ol');
@@ -90,7 +101,8 @@ function bloqueCodigo(codigo, lang, opts = {}) {
     ol.append(li);
   });
   if (opts.tocar) { ol.setAttribute('role', 'listbox'); ol.setAttribute('aria-label', 'Líneas del programa'); }
-  return h('div', { class: 'codigo', role: opts.tocar ? 'group' : null, 'aria-label': 'Código en ' + (NL[lang] || lang) }, ol);
+  // tabindex: si el código es más ancho que la pantalla, se puede desplazar también con el teclado
+  return h('div', { class: 'codigo', role: opts.tocar ? 'group' : 'region', tabindex: opts.tocar ? null : '0', 'aria-label': 'Código en ' + (NL[lang] || lang) }, ol);
 }
 const salidaBloque = s => s === '' ? h('div', { class: 'salida vacia' }, '(no muestra nada)') : h('div', { class: 'salida' }, s);
 
@@ -203,7 +215,7 @@ function hojaPapel({ id, etiqueta, valor = '', bloqueada = false, alCambiar, alC
     caja.append(campo);
     // Qué significa cada color: en los editores de verdad (VS Code, PyCharm…) cada color marca un tipo de pieza
     if (colores) caja.append(h('p', { class: 'leyenda-colores', 'aria-label': 'Qué significa cada color' },
-      h('span', { class: 'kw' }, 'palabras clave'), h('span', { class: 'str' }, '"textos"'), h('span', { class: 'nu' }, 'números'), h('span', { class: 'fn' }, 'funciones()'), h('span', { class: 'com' }, 'comentarios')));
+      h('span', { class: 'kw' }, 'palabras clave'), h('span', { class: 'kw ctl' }, 'control (if, while)'), h('span', { class: 'str' }, '"textos"'), h('span', { class: 'nu' }, 'números'), h('span', { class: 'fn' }, 'funciones()'), h('span', { class: 'var' }, 'variables'), h('span', { class: 'com' }, 'comentarios')));
     if (lang && !bloqueada) caja.append(h('div', { class: 'fila', style: 'justify-content:flex-end' }, h('button', { class: 'btn plano chico', type: 'button', 'aria-pressed': String(!colores),
       onclick: () => { ls.set('hoja-colores', !colores); pon(true); } }, colores ? 'Quitar colores (como el bloc de notas)' : 'Poner colores')));
     if (enfocar) { const t = caja.querySelector('textarea'); if (t) t.focus(); }
@@ -234,5 +246,5 @@ async function copia(texto) {
   return false;
 }
 
-raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, COLORES_RANGO, emblema, celebra, miles, hojaPapel, listaPruebas, aplicaAspecto, vibra, copia, reduceMovimiento };
+raiz.UI = { $, h, esc, ls, mmss, NL, aviso, resalta, piezas, bloqueCodigo, salidaBloque, editor, CINTURONES, cinturon, COLORES_RANGO, emblema, celebra, miles, hojaPapel, listaPruebas, aplicaAspecto, vibra, copia, reduceMovimiento };
 })(window);

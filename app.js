@@ -159,7 +159,7 @@ function mostrar(v, forzar) {
   if (cambia) { window.scrollTo(0, 0); const s = $('#v-' + v); if (s && !U.reduceMovimiento()) { s.classList.remove('aparece'); void s.offsetWidth; s.classList.add('aparece'); } }
 }
 window.addEventListener('hashchange', () => mostrar(location.hash.slice(1)));
-function repintar() { U.aplicaAspecto(P.d.ajustes.aspecto); pintaRango(); pintaBandas(); PINTA[vista](); }
+function repintar() { U.aplicaAspecto(P.d.ajustes.aspecto); aplicaTemaCodigo(); pintaRango(); pintaBandas(); PINTA[vista](); }
 
 /* ───────────── La espera de Claude y el bloque de foco ───────────── */
 let espera = ls.get('espera', null);   // { inicio, retos }
@@ -378,6 +378,7 @@ function sorteo(items, peso) { const ps = items.map(peso), tot = ps.reduce((a, b
 function elegirSpec() {
   const aj = P.d.ajustes, langsOk = aj.lang === 'mezcla' ? LANGS : [aj.lang];
   colaSesion.forEach(x => { x.tras++; });
+  if (retoDirigido && retoDirigido.pieza) { retoDirigido = null; return { pieza: true, tema: temaActual().id, marca: 'Los colores' }; }
   if (retoDirigido) { const r = retoDirigido; retoDirigido = null; return { tpl: r.tpl, lang: r.lang, tipo: tipoAlAzar(), seed: semilla(), marca: 'Práctica dirigida' }; }
   const k = colaSesion.findIndex(x => x.tras >= 3);
   if (k >= 0 && Math.random() < 0.6) { const x = colaSesion.splice(k, 1)[0]; return { tpl: x.tpl, lang: x.lang, tipo: x.tipo, seed: x.seed, marca: 'Otra vez' }; }
@@ -396,6 +397,7 @@ function elegirSpec() {
   const t = sorteo(cands, x => (x.id === ultimaPlantilla && cands.length > 1 ? 0.15 : cajaMin(x) < 0 ? 4 : 1 + (5 - cajaMin(x)) * 0.6));
   ultimaPlantilla = t.id;
   const ok = D.langsDe(t).filter(l => langsOk.includes(l));
+  if (Math.random() < 0.12) return { pieza: true, tema: temaId };   // de vez en cuando: ¿qué pieza es?
   if (Math.random() < cuotaEscritura(temaId)) {
     if (Math.random() < 0.45) { const ta = tareaPara(temaId); if (ta) return { escribe: ta.id, tema: temaId, lang: azar(langsOk) }; }
     return { tpl: t.id, lang: azar(ok.length ? ok : D.langsDe(t)), tipo: 'completa', seed: semilla(), estricto: true };
@@ -406,6 +408,7 @@ function elegirSpec() {
 function generaReto() {
   for (let intento = 0; intento < 4; intento++) {
     const spec = elegirSpec();
+    if (spec.pieza) { const r = generaPieza(spec.tema, P.d.ajustes.lang === 'mezcla' ? azar(LANGS) : P.d.ajustes.lang); if (r) { r.marca = spec.marca || ''; return r; } continue; }
     if (spec.escribe) { const ta = W.porId[spec.escribe]; return { tipo: 'escribe', tema: spec.tema, lang: spec.lang, tarea: ta, spec, entradas: [], marca: '' }; }
     let r = null; try { r = D.generar(spec) || D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (e) { try { r = D.generar(Object.assign({}, spec, { tipo: 'salida' })); } catch (x) { r = null; } }
     if (r) { r.marca = spec.marca || ''; return r; }
@@ -431,9 +434,10 @@ function siguienteReto() {
   retoListo = null; PINTA.retos();
 }
 function registra(ok) {
-  const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.tipo === 'escribe' ? null : reto.spec.tpl, tarea: reto.tipo === 'escribe' ? reto.tarea.id : null, tipo: reto.tipo, lang: reto.lang, ok });
-  if (!ok && reto.tipo !== 'escribe') colaSesion.push({ tpl: reto.spec.tpl, lang: reto.lang, tipo: reto.tipo, seed: (reto.spec.seed + 104729) % 2147483647, tras: 0 });
+  const res = N.registraReto(P.d, D, { tema: reto.tema, tpl: reto.tipo === 'escribe' || reto.tipo === 'pieza' ? null : reto.spec.tpl, tarea: reto.tipo === 'escribe' ? reto.tarea.id : null, tipo: reto.tipo, lang: reto.lang, ok });
+  if (!ok && reto.tipo !== 'escribe' && reto.tipo !== 'pieza') colaSesion.push({ tpl: reto.spec.tpl, lang: reto.lang, tipo: reto.tipo, seed: (reto.spec.seed + 104729) % 2147483647, tras: 0 });
   ultimoRes = res; trataPuntos(res, ok);
+  if (ok && reto.tipo === 'pieza') ls.set('pieza-aciertos', ls.get('pieza-aciertos', 0) + 1);
   if (res.cinturon) U.celebra(res.cinturon, `Dominaste «${D.temas.find(t => t.id === reto.tema).titulo}». Siguiente tema: «${temaActual().titulo}».`);
   else if (res.metaCumplida) aviso(`Meta de hoy cumplida: ${P.d.ajustes.meta} retos. +${N.PUNTOS.meta} puntos.`);
 }
@@ -478,6 +482,9 @@ function cuerpoReto() {
     if (escrito.linea !== undefined) campo.value = escrito.linea;
     campo.addEventListener('input', () => { escrito.linea = campo.value; });
     partes.push(campo, respondido ? null : h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => compruebaLinea(campo.value) }, 'Comprobar')));
+  } else if (r.tipo === 'pieza') {
+    partes.push(h('h2', null, '¿Qué pieza es la marcada?'), h('p', { class: 'tenue' }, r.sinColor ? 'Sin colores, como en papel o en el bloc de notas: fíjate en la forma.' : 'Fíjate en el color y en la forma.'),
+      codigoConMarca(r), opcionesTexto(r.opciones));
   } else if (r.tipo === 'escribe') {
     const t = r.tarea;
     partes.push(h('h2', null, `Escríbelo en ${NL[l]}`), h('p', { class: 'enunciado' }, t.enunciado),
@@ -496,6 +503,86 @@ function cuerpoReto() {
   }
   return partes;
 }
+/* ¿Qué pieza es? Se marca un trozo del código y hay que decir de qué categoría es. Primero con colores;
+   cuando ya aciertas, la mitad de las veces sin colores, como en papel. */
+const CATEGORIAS = {
+  clave: { n: 'Palabra clave', ex: 'Es una palabra reservada del lenguaje: una orden o una parte de una orden (Escribir, def, int, if…). Las de control (si, mientras, if, while, for, return) deciden por dónde sigue el programa.', dojo: 'azul claro', vscode: 'azul; las de control, morado' },
+  texto: { n: 'Texto (entre comillas)', ex: 'Va entre comillas y sale tal cual. Si se te olvida cerrar las comillas, todo lo de detrás se pinta de este color: así se ve el error.', dojo: 'amarillo', vscode: 'naranja' },
+  numero: { n: 'Número', ex: 'Un valor numérico escrito directamente en el código.', dojo: 'salmón', vscode: 'verde claro' },
+  funcion: { n: 'Función', ex: 'Un nombre seguido de paréntesis: hace una tarea (print, input, len, Longitud…). Las tuyas también se pintan así.', dojo: 'verde menta', vscode: 'amarillo' },
+  variable: { n: 'Variable', ex: 'Un nombre que tú inventas para guardar un valor (total, n, nombre…).', dojo: 'blanco', vscode: 'celeste' },
+  comentario: { n: 'Comentario', ex: 'Una nota para personas: el programa la ignora. En Python empieza con #; en PSeInt y C++, con //.', dojo: 'gris en cursiva', vscode: 'verde' }
+};
+const CAT_DE = { kw: 'clave', ctl: 'clave', dir: 'clave', str: 'texto', nu: 'numero', fn: 'funcion', var: 'variable', com: 'comentario' };
+const NO_PREGUNTAR = new Set(['cout', 'cin', 'endl', 'std', 'main', 'string', 'int', 'str', 'float', 'list', 'Algoritmo', 'FinAlgoritmo']);
+const COMENTARIOS = ['calcula el total', 'pide los datos', 'muestra el resultado', 'empieza el programa', 'comprueba el valor'];
+const CLASE_CAT = { com: 'com', dir: 'kw ctl', str: 'str', nu: 'nu', ctl: 'kw ctl', kw: 'kw', fn: 'fn', var: 'var' };
+function generaPieza(temaId, lang) {
+  const cands = D.plantillas.filter(t => t.tema === temaId && D.langsDe(t).includes(lang)); if (!cands.length) return null;
+  const t = azar(cands); let base = null; try { base = D.generar({ tpl: t.id, lang, tipo: 'salida', seed: semilla() }); } catch (e) { base = null; } if (!base) return null;
+  let codigo = base.codigo;
+  if (Math.random() < 0.3) codigo = (lang === 'py' ? '# ' : '// ') + azar(COMENTARIOS) + '\n' + codigo;
+  const ls_ = codigo.split('\n').map(l => U.piezas(l, lang)), porCat = {};
+  ls_.forEach((ps, i) => ps.forEach((x, k) => { const c = CAT_DE[x.c]; if (c && !NO_PREGUNTAR.has(x.t.trim())) (porCat[c] = porCat[c] || []).push({ i, k }); }));
+  const cats = Object.keys(porCat); if (cats.length < 2) return null;
+  const cat = azar(cats), sitio = azar(porCat[cat]);
+  const otras = Object.keys(CATEGORIAS).filter(c => c !== cat).sort(() => Math.random() - 0.5).slice(0, 3);
+  const ops = [cat, ...otras].sort(() => Math.random() - 0.5);
+  const aciertos = ls.get('pieza-aciertos', 0);
+  return { tipo: 'pieza', tema: temaId, lang, codigo, lineas: ls_, sitio, cat, ops, opciones: ops.map(c => CATEGORIAS[c].n), correcta: ops.indexOf(cat), sinColor: aciertos >= 5 && Math.random() < 0.5, spec: {}, entradas: [], token: ls_[sitio.i][sitio.k].t.trim() };
+}
+function codigoConMarca(r) {
+  const ol = h('ol');
+  r.lineas.forEach((ps, i) => {
+    const li = h('li');
+    ps.forEach((x, k) => { const marcada = i === r.sitio.i && k === r.sitio.k; li.append(CLASE_CAT[x.c] || marcada ? h('span', { class: (CLASE_CAT[x.c] || '') + (marcada ? ' marcada' : '') }, x.t) : document.createTextNode(x.t)); });
+    if (!ps.length) li.textContent = ' ';
+    ol.append(li);
+  });
+  return h('div', { class: 'codigo' + (r.sinColor ? ' sin-color' : ''), role: 'group', 'aria-label': `Código en ${NL[r.lang]}; la pieza marcada es «${r.token}»` }, ol);
+}
+function respuestaPieza() {
+  const r = reto, ok = elegida === r.correcta, C = CATEGORIAS[r.cat], art = { clave: 'una', funcion: 'una', variable: 'una' }[r.cat] || 'un';
+  return h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' },
+    h('div', { class: 'entre' }, h('h3', null, ok ? 'Correcto' : 'No era esa'), chipPuntos(ultimoRes)),
+    h('p', null, h('code', { class: 'mono' }, r.token), ` es ${art} `, h('b', null, C.n.toLowerCase()), '. ', C.ex),
+    h('p', { class: 'tenue' }, `Color en el Dojo: ${C.dojo}. En VS Code (tema oscuro): ${C.vscode}.`),
+    h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'siguiente', onclick: siguienteReto }, 'Siguiente reto'), h('button', { class: 'btn plano', onclick: () => { temaAbierto = 'colores'; ir('ruta'); } }, 'Ver la lección de los colores')));
+}
+
+const EJEMPLO_COLORES = {
+  ps: '// Pide la edad y la compara\nLeer edad\nSi edad >= 18 Entonces\n    Escribir "Eres mayor de edad"\nFinSi\nEscribir Longitud("Ana")',
+  py: '# Pide la edad y la compara\nedad = int(input())\nif edad >= 18:\n    print("Eres mayor de edad")\nprint(len("Ana"))',
+  cpp: '// Pide la edad y la compara\nint edad;\ncin >> edad;\nif (edad >= 18) {\n    cout << "Eres mayor de edad" << endl;\n}'
+};
+const MUESTRA = { clave: { ps: 'Si', py: 'if', cpp: 'if' }, texto: { ps: '"Eres mayor…"', py: '"Eres mayor…"', cpp: '"Eres mayor…"' }, numero: { ps: '18', py: '18', cpp: '18' }, funcion: { ps: 'Longitud', py: 'print', cpp: 'endl' }, variable: { ps: 'edad', py: 'edad', cpp: 'edad' }, comentario: { ps: '// Pide…', py: '# Pide…', cpp: '// Pide…' } };
+const CLASE_MUESTRA = { clave: 'kw ctl', texto: 'str', numero: 'nu', funcion: 'fn', variable: 'var', comentario: 'com' };
+function leccionColores() {
+  const aj = P.d.ajustes;
+  const tema = h('div', { class: 'chips', role: 'group', 'aria-label': 'Colores del código' }, ...[['dojo', 'Colores del Dojo'], ['vscode', 'Colores de VS Code']].map(([v, n]) => h('button', { class: 'chip', 'aria-pressed': String(aj.temaCodigo === v), onclick: () => { aj.temaCodigo = v; P.cambio(); aplicaTemaCodigo(); PINTA.ruta(); } }, n)));
+  return h('div', { class: 'columna' },
+    h('div', null, h('button', { class: 'btn plano', onclick: () => { temaAbierto = null; PINTA.ruta(); } }, '← Todos los temas')),
+    h('section', { class: 'tarjeta' }, h('span', { class: 'etiqueta' }, 'Lección'), h('h1', null, 'Leer el código por colores'),
+      h('p', null, 'Los editores de código (VS Code, PyCharm, Notepad++…) pintan cada pieza del código según lo que es. Se llama ', h('b', null, 'resaltado de sintaxis'), '. No cambia lo que hace el programa: solo te ayuda a leerlo de un vistazo y a ver errores, como unas comillas sin cerrar.'),
+      h('p', { class: 'tenue' }, 'Los colores no son universales: los decide el tema del editor. Lo universal son las categorías. Si sabes qué es cada pieza, la reconoces en cualquier editor, con cualquier tema, y también en papel.'),
+      h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Ver con los colores de'), tema)),
+    h('section', { class: 'tarjeta' }, h('h2', null, 'Las seis categorías'),
+      h('div', { class: 'categorias' }, ...Object.entries(CATEGORIAS).map(([k, C]) => h('div', { class: 'categoria' },
+        h('div', { class: 'muestra codigo' }, h('span', { class: CLASE_MUESTRA[k] }, MUESTRA[k].py)),
+        h('div', { class: 'pila', style: 'gap:2px' }, h('b', null, C.n), h('span', { class: 'tenue' }, C.ex), h('small', { class: 'tenue' }, `Dojo: ${C.dojo} · VS Code: ${C.vscode}`)))))),
+    h('section', { class: 'tarjeta' }, h('h2', null, 'El mismo programa en los tres lenguajes'),
+      h('div', { class: 'lenguajes3' }, ...['ps', 'py', 'cpp'].map(l => h('div', { class: 'pila' }, h('span', { class: 'etiqueta' }, NL[l]), bloqueCodigo(EJEMPLO_COLORES[l], l)))),
+      h('p', { class: 'tenue', style: 'font-size:13.5px' }, 'Fíjate: las palabras clave cambian de un lenguaje a otro (Si / if), pero la categoría es la misma. Y el texto entre comillas siempre se ve igual.')),
+    h('section', { class: 'tarjeta' }, h('h2', null, 'En VS Code'),
+      h('ul', { class: 'lista' },
+        h('li', null, 'Su tema oscuro por defecto (Dark+) pinta las palabras clave de azul y las de control (if, while, for, return) de morado; los textos de naranja, los números de verde claro, las funciones de amarillo, las variables de celeste y los comentarios de verde.'),
+        h('li', null, 'Python y C++ ya vienen coloreados; para PSeInt hace falta instalar una extensión (busca «PSeInt» en Extensiones).'),
+        h('li', null, 'Puedes cambiar de tema en Archivo → Preferencias → Tema de color. El código es el mismo: solo cambia cómo se ve.')),
+      h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => { retoDirigido = { pieza: true }; nuevoReto(); ir('retos'); } }, 'Practicar: ¿qué pieza es?'))));
+}
+/* El tema de colores del código: el del Dojo o el de VS Code (Dark+) */
+function aplicaTemaCodigo() { document.documentElement.setAttribute('data-codigo', P.d.ajustes.temaCodigo === 'vscode' ? 'vscode' : 'dojo'); }
+
 /* Escribir: lo escrito se guarda por reto (si la pantalla se repinta, no se pierde) */
 let escrito = {};
 const hojaPapel = (id, etiqueta, bloqueada, alComprobar, lang) => U.hojaPapel({ id, etiqueta, bloqueada, lang, valor: escrito[id] || '', alCambiar: v => { escrito[id] = v; }, alComprobar });
@@ -537,6 +624,7 @@ ${x.resultados.map(p => `Datos: ${p.entradas.join(', ') || '(ninguno)'} · Debí
 }
 function respuestaReto() {
   if (reto.tipo === 'escribe') return respuestaEscribe();
+  if (reto.tipo === 'pieza') return respuestaPieza();
   const r = reto, ok = elegida === r.correcta;
   const caja = h('div', { class: 'respuesta ' + (ok ? 'si' : 'no'), role: 'status' }, h('div', { class: 'entre' }, h('h3', null, ok ? 'Correcto' : r.tipo === 'ordenar' ? 'Ese orden no da lo mismo' : 'No era esa'), chipPuntos(ultimoRes)));
   if (r.tipo === 'completa') {
@@ -601,6 +689,7 @@ let temaAbierto = null, langEjemplo = ls.get('lang-ejemplo', 'py');
 function abrirTema(id) { temaAbierto = id; if (vista === 'ruta') PINTA.ruta(); else ir('ruta'); }
 PINTA.ruta = function () {
   const el = $('#v-ruta'); el.textContent = '';
+  if (temaAbierto === 'colores') { el.append(leccionColores()); return; }
   if (temaAbierto) { el.append(detalleTema(D.temas.find(t => t.id === temaAbierto))); return; }
   const actual = temaActual();
   const lista = h('ol', { class: 'temas' }, ...D.temas.map((t, k) => {
@@ -618,6 +707,9 @@ PINTA.ruta = function () {
     h('div', { class: 'tarjeta' }, h('h1', null, 'La ruta'),
       h('p', { class: 'tenue' }, 'Diez temas en orden. Cada uno explica una idea una sola vez y la enseña en los tres lenguajes a la vez: aprendes la lógica con PSeInt y ves cómo se escribe en Python y en C++. Cada tema dominado es un cinturón nuevo.'),
       h('p', { class: 'tenue', style: 'font-size:13.5px' }, 'Dominar un tema = acertar 8 de los últimos 10 retos del tema y resolver al menos uno de sus dos ejercicios en el laboratorio, en el lenguaje que quieras.')),
+    h('section', { class: 'tarjeta leccion-colores-tarjeta' }, h('div', { class: 'entre' }, h('h2', null, 'Lección: leer el código por colores'), h('span', { class: 'insignia ai' }, 'Para todos los temas')),
+      h('p', { class: 'tenue' }, 'Qué significa cada color: palabras clave, textos, números, funciones, variables y comentarios. Y cómo se ven en VS Code, para que al pasar a programar allí ya los reconozcas.'),
+      h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => abrirTema('colores') }, 'Abrir la lección'), h('button', { class: 'btn', onclick: () => { retoDirigido = { pieza: true }; nuevoReto(); ir('retos'); } }, 'Practicar: ¿qué pieza es?'))),
     lista,
     h('section', { class: 'tarjeta' }, h('div', { class: 'entre' }, h('h2', null, 'Rama extra: HTML'), h('span', { class: 'insignia' + (htmlHechas === D.html.length ? ' bien' : '') }, `${htmlHechas} de ${D.html.length}`)),
       h('p', { class: 'tenue' }, 'Tres lecciones cortas para hacer tu primera página web. No es programación, pero se aprende en una tarde y ves el resultado al momento.'),
@@ -940,6 +1032,7 @@ PINTA.plan = function () {
         selector('aj-meta-ingles', 'Ejercicios de inglés al día', aj.metaIngles, [[5, '5'], [10, '10'], [15, '15'], [20, '20']], v => { aj.metaIngles = +v; P.cambio(); }),
         selector('aj-foco', 'Bloque de foco', aj.foco, [[15, '15 min'], [25, '25 min'], [45, '45 min'], [60, '60 min']], v => { aj.foco = +v; P.cambio(); }),
         selector('aj-lang', 'Lenguaje de los retos', aj.lang, [['mezcla', 'Los tres'], ['ps', 'PSeInt'], ['py', 'Python'], ['cpp', 'C++']], v => { aj.lang = v; P.cambio(); reto = null; }),
+        selector('aj-tema-codigo', 'Colores del código', aj.temaCodigo, [['dojo', 'Los del Dojo'], ['vscode', 'Como VS Code (oscuro)']], v => { aj.temaCodigo = v; P.cambio(); aplicaTemaCodigo(); }),
         selector('aj-aspecto', 'Aspecto', aj.aspecto, [['sistema', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']], v => { aj.aspecto = v; P.cambio(); U.aplicaAspecto(v); }),
         selector('aj-vibrar', 'Vibrar al responder', aj.vibrar ? 'si' : 'no', [['si', 'Sí'], ['no', 'No']], v => { aj.vibrar = v === 'si'; P.cambio(); U.vibra(18, aj.vibrar); }))),
     tarjetaApp(), tarjetaCopia(), tarjetaPrivacidad()));
@@ -1038,7 +1131,7 @@ const VI = window.VistaIngles({ P, N, I, U, Voz, ir, aviso, botonTutor, trataPun
 PINTA.ingles = () => VI.pinta();
 
 /* ───────────── Arranque ───────────── */
-U.aplicaAspecto(P.d.ajustes.aspecto);
+U.aplicaAspecto(P.d.ajustes.aspecto); aplicaTemaCodigo();
 if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => U.aplicaAspecto(P.d.ajustes.aspecto));
 document.querySelectorAll('.boton-instalar').forEach(b => b.addEventListener('click', instalar));
 Voz.iniciar(enClaude);

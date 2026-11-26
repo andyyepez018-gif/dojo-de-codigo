@@ -366,7 +366,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.goto(URL + '#retos'); await p.waitForSelector('.reto');
   // forzar los dos tipos de escritura: se busca hasta que salgan (en el tema 1 dominado salen a menudo)
   let vioCompleta = false, vioEscribe = false;
-  for (let k = 0; k < 60 && !(vioCompleta && vioEscribe); k++) {
+  for (let k = 0; k < 150 && !(vioCompleta && vioEscribe); k++) {
     const tipo = (await p.textContent('.reto-cab .etiqueta')).trim();
     if (tipo === 'Escribe la línea que falta' && !vioCompleta) {
       const linea = await p.evaluate(() => null);
@@ -409,6 +409,35 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   const [descarga] = await Promise.all([p.waitForEvent('download'), p.getByRole('button', { name: 'Añadir al calendario' }).click()]);
   const ics = fs.readFileSync(await descarga.path(), 'utf8');
   ok('el recordatorio es un evento diario con aviso', /BEGIN:VCALENDAR/.test(ics) && /RRULE:FREQ=DAILY/.test(ics) && /BEGIN:VALARM/.test(ics) && /T180000/.test(ics), ics.slice(0, 200));
+  await c.close();
+
+  console.log('16. Los colores del código: lección, tema de VS Code y «¿Qué pieza es?»');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 50 }));
+  await p.goto(URL + '#ruta'); await p.waitForSelector('.leccion-colores-tarjeta');
+  await p.locator('.leccion-colores-tarjeta').getByRole('button', { name: 'Abrir la lección' }).click(); await p.waitForSelector('.categorias');
+  ok('la lección enseña las seis categorías y VS Code', await p.locator('.categoria').count() === 6 && /resaltado de sintaxis/.test(await p.textContent('#v-ruta')) && /Dark\+/.test(await p.textContent('#v-ruta')));
+  const color = sel => p.evaluate(sl => getComputedStyle(document.querySelector(sl)).color, sel);
+  ok('con el tema del Dojo, los textos son ámbar', await color('#v-ruta .lenguajes3 .codigo .str') === 'rgb(243, 198, 119)');
+  await p.getByRole('button', { name: 'Colores de VS Code' }).click(); await pausa(150);
+  ok('con el tema de VS Code: textos naranja, control morado, variables celeste, fondo #1E1E1E', await color('#v-ruta .lenguajes3 .codigo .str') === 'rgb(206, 145, 120)' && await color('#v-ruta .lenguajes3 .codigo .ctl') === 'rgb(197, 134, 192)' && await color('#v-ruta .lenguajes3 .codigo .var') === 'rgb(156, 220, 254)' && await p.evaluate(() => getComputedStyle(document.querySelector('#v-ruta .lenguajes3 .codigo')).backgroundColor) === 'rgb(30, 30, 30)');
+  await p.screenshot({ path: path.join(CAPTURAS, '27-leccion-colores.png'), fullPage: true });
+  await p.goto(URL + '#plan'); await p.waitForSelector('#aj-tema-codigo');
+  ok('el tema elegido se guarda y está en Ajustes', await p.inputValue('#aj-tema-codigo') === 'vscode');
+  await p.locator('#menu-lateral a[href="#ruta"]').click(); await p.locator('.leccion-colores-tarjeta').getByRole('button', { name: 'Practicar: ¿qué pieza es?' }).click(); await p.waitForSelector('.reto');
+  const NOMBRE_CAT = { kw: 'Palabra clave', str: 'Texto (entre comillas)', nu: 'Número', fn: 'Función', var: 'Variable', com: 'Comentario' };
+  let piezasBien = 0, piezasVistas = 0;
+  for (let k = 0; k < 30 && piezasVistas < 6; k++) {
+    if ((await p.textContent('.reto-cab .etiqueta')).trim() === '¿Qué pieza es?' || await p.locator('.codigo .marcada').count()) {
+      piezasVistas++;
+      const clase = await p.evaluate(() => document.querySelector('.codigo .marcada').className.split(' ').find(x => ['kw', 'str', 'nu', 'fn', 'var', 'com'].includes(x)));
+      const ops = await p.locator('.opcion pre').allTextContents();
+      await p.locator('.opcion').nth(ops.indexOf(NOMBRE_CAT[clase])).click(); await p.waitForSelector('.respuesta');
+      if (await p.locator('.respuesta.si').count()) piezasBien++;
+      if (piezasVistas === 1) await p.screenshot({ path: path.join(CAPTURAS, '28-que-pieza.png') });
+    } else { await responderReto(p); await p.waitForSelector('.respuesta').catch(() => {}); }
+    await cierraFiesta(p); await p.click('#siguiente'); await p.waitForSelector('.reto');
+  }
+  ok('«¿Qué pieza es?»: la categoría marcada es la buena (el robot lee el color y acierta)', piezasVistas >= 1 && piezasBien === piezasVistas, [piezasBien, piezasVistas]);
   await c.close();
 
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');

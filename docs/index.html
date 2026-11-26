@@ -339,7 +339,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 .tema b { font: 700 16px/1.25 var(--f-titulo); display: block; }
 .tema .detalle { min-width: 0; display: grid; gap: 6px; }
 .tema .barra { max-width: 220px; }
-.lenguajes3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.lenguajes3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
 @media (max-width: 760px) { .lenguajes3 { grid-template-columns: 1fr; } }
 .lista { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 
@@ -447,7 +447,20 @@ details.desplegable[open] { display: grid; gap: 14px; }
 .actualizacion:not([hidden]) ~ .aviso, .aviso:has(~ .actualizacion:not([hidden])) { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
 .actualizacion .btn { background: var(--papel); color: var(--tinta); border-color: var(--papel); }
 @media (max-width: 420px) { .cabecera .marca b { font-size: 14px; } .cabecera .boton-instalar { padding: 5px 10px; } }
+/* Categorías nuevas del resaltado: control (if, while…) y variables; con el tema del Dojo se ven como antes */
+:root { --pz-ctl: var(--pz-kw); --pz-var: var(--pz-texto); }
+.codigo .ctl, .editor .pintado .ctl, .leyenda-colores .ctl { color: var(--pz-ctl); }
+.codigo .var, .editor .pintado .var, .leyenda-colores .var { color: var(--pz-var); }
+.codigo.sin-color span { color: var(--pz-texto) !important; font-style: normal !important; }
+.codigo .marcada { box-shadow: 0 0 0 2px #fff; border-radius: 3px; background: rgba(255, 255, 255, .14); padding: 0 1px; }
+.categorias { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .categorias { grid-template-columns: 1fr 1fr; } }
+.categoria { display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 12px; align-items: start; }
+.categoria .muestra { padding: 10px 12px; font-size: 14px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+/* Colores como VS Code (tema oscuro Dark+): mismo código, otro tema. Va al final para mandar sobre lo anterior. */
+:root[data-codigo="vscode"] { --pizarra: #1E1E1E; --pizarra-borde: #2B2B2B; --pz-texto: #D4D4D4; --pz-tenue: #858585; --pz-kw: #569CD6; --pz-ctl: #C586C0; --pz-str: #CE9178; --pz-num: #B5CEA8; --pz-fn: #DCDCAA; --pz-var: #9CDCFE; --pz-com: #6A9955; --pz-sel: #264F78; }
+:root[data-codigo="vscode"] .codigo .com, :root[data-codigo="vscode"] .editor .pintado .com { font-style: normal; }
 </style>
 
 <div class="app">

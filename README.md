@@ -24,6 +24,10 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
   (20 tareas, 2 por tema, en una hoja en blanco con colores pero sin autocompletar ni pistas, como si fuera
   en papel o en el bloc de notas, y un botón para quitar los colores; se corrige ejecutándolo con varios datos, así que copiar la salida no vale). Al empezar un tema
   solo se lee; luego una cuarta parte de los retos son de escribir y, al dominarlo, el 40 %.
+- **Leer el código por colores:** una lección (las seis categorías del resaltado: palabras clave,
+  textos, números, funciones, variables y comentarios), el reto «¿Qué pieza es?» (primero con colores y,
+  cuando aciertas, la mitad de las veces sin ellos) y dos temas de colores: el del Dojo y el de VS Code
+  (Dark+), para que al pasar a VS Code ya los reconozcas.
 - **Proyecto guiado por rango:** 9 proyectos (de la ficha de programador al analizador de texto), en 3
   pasos que se construyen uno sobre otro; hay que terminarlo para poder hacer el examen del rango.
 - **Recordatorio diario:** un evento del calendario que suena cada día a tu hora (archivo .ics), y el

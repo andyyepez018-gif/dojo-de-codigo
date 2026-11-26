@@ -2,7 +2,7 @@
    No toca el DOM, así que se prueba igual en Node que en el navegador. */
 (function (raiz) {
 'use strict';
-const VERSION = '1.5.0';
+const VERSION = '1.6.0';
 const LANGS = ['ps', 'py', 'cpp'];
 const REGLA = 'Si le mando un mensaje a Claude, entonces abro el Dojo y hago retos hasta que me responda.';
 const INTERVALOS = [0, 1, 3, 7, 16, 35];   // días hasta el siguiente repaso según la caja (0 = fallado)
@@ -58,7 +58,7 @@ function NUEVO() {
     v: 2, actualizado: 0, puntos: 0, rangoMax: 0, combo: 0, dias: {}, temas: {}, ejercicios: {}, tarjetas: {}, html: {}, bienvenida: false,
     ingles: { unidades: {}, tarjetas: {} }, jerga: { bloques: {}, tarjetas: {} }, examenes: { reintento: 0, historial: [], repaso: [] }, escritos: {}, proyectos: {},
     porLang: { ps: { retos: 0, aciertos: 0 }, py: { retos: 0, aciertos: 0 }, cpp: { retos: 0, aciertos: 0 } },
-    ajustes: { meta: 20, metaIngles: 10, foco: 25, lang: 'mezcla', tema: 'auto', aspecto: 'sistema', vibrar: true, voz: 1 },
+    ajustes: { meta: 20, metaIngles: 10, foco: 25, lang: 'mezcla', tema: 'auto', aspecto: 'sistema', temaCodigo: 'dojo', vibrar: true, voz: 1 },
     plan: { checks: {}, regla: REGLA }
   };
 }
@@ -142,7 +142,7 @@ function normaliza(d, D, I, J) {
   n.ajustes = {
     meta: elige(a.meta, [10, 20, 30, 50], 20), metaIngles: elige(a.metaIngles, [5, 10, 15, 20], 10), foco: elige(a.foco, [15, 25, 45, 60], 25), lang: elige(a.lang, ['mezcla', ...LANGS], 'mezcla'),
     tema: a.tema === 'auto' || a.tema === 'todo' || a.tema === 'repaso' || D.temas.some(t => t.id === a.tema) ? a.tema : 'auto',
-    aspecto: elige(a.aspecto, ['sistema', 'claro', 'oscuro'], 'sistema'), vibrar: a.vibrar !== false, voz: elige(a.voz, [0.75, 1], 1)
+    aspecto: elige(a.aspecto, ['sistema', 'claro', 'oscuro'], 'sistema'), temaCodigo: elige(a.temaCodigo, ['dojo', 'vscode'], 'dojo'), vibrar: a.vibrar !== false, voz: elige(a.voz, [0.75, 1], 1)
   };
   const pl = d.plan || {};
   if (pl.checks && typeof pl.checks === 'object') for (const k of Object.keys(pl.checks)) if (/^[a-z-]{1,30}$/.test(k) && pl.checks[k] === true) n.plan.checks[k] = true;

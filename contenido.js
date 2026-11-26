@@ -691,7 +691,7 @@ const limpia = s => String(s).split('\n').map(l => l.replace(/\s+$/, '')).join('
 const porId = {}; plantillas.forEach(t => { porId[t.id] = t; });
 const langsDe = t => t.solo || ['ps', 'py', 'cpp'];
 const TIPOS = ['salida', 'hueco', 'ordenar', 'error', 'traducir', 'completa'];
-const NOMBRE_TIPO = { salida: '¿Qué muestra?', hueco: 'Completa el hueco', ordenar: 'Ordena las líneas', error: 'Encuentra el error', traducir: 'Traduce', completa: 'Escribe la línea que falta', escribe: 'Escríbelo tú' };
+const NOMBRE_TIPO = { salida: '¿Qué muestra?', hueco: 'Completa el hueco', ordenar: 'Ordena las líneas', error: 'Encuentra el error', traducir: 'Traduce', completa: 'Escribe la línea que falta', escribe: 'Escríbelo tú', pieza: '¿Qué pieza es?' };
 
 function ejecuta(codigo, lang, entradas) {
   const r = raiz.Motor.correr(codigo, lang, entradas);
