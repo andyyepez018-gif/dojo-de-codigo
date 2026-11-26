@@ -41,5 +41,21 @@ async function resuelveIngles(p, bien = true) {
   catch (e) { throw new Error(`el ejercicio «${tipo}» no se pudo responder: ${(await p.textContent('#v-ingles .ejercicio')).slice(0, 300)}`); }
   return tipo;
 }
-const cierraFiesta = async p => { if (await p.locator('.capa').count()) await p.locator('.capa').getByRole('button', { name: 'Seguir' }).click(); };
-module.exports = { vozFalsa, resuelveIngles, cierraFiesta, CURSO };
+const cierraFiesta = async p => { if (await p.locator('.capa').count()) await p.locator('.capa').getByRole('button', { name: /^(Seguir|Luego)$/ }).click(); };
+/* Responde la pregunta del examen en pantalla, bien o mal a propósito (lee el examen con el gancho de pruebas) */
+async function resuelveExamen(p, bien = true) {
+  const q = await p.evaluate(() => { const st = window.__examen(), x = st.preguntas[st.i]; return JSON.parse(JSON.stringify({ area: x.area, r: x.r, e: x.e })); });
+  const t = q.area === 'codigo' ? q.r.tipo : q.e.tipo, x = q.area === 'codigo' ? q.r : q.e;
+  if (q.area === 'codigo' && t === 'error') await p.locator('#v-examen .codigo li').nth(bien ? x.lineaMal : (x.lineaMal + 1) % x.codigoMal.replace(/\n+$/, '').split('\n').length).click();
+  else if (q.area === 'codigo' && t === 'ordenar') {
+    const lineas = x.codigo.split('\n').filter(l => l.trim() !== ''); if (!bien) lineas.reverse();
+    for (const l of lineas) await p.evaluate(l => { const b = [...document.querySelectorAll('#v-examen .piezas .pieza')].find(y => y.textContent === l); if (b) b.click(); }, l);
+  } else if (q.area === 'ingles' && t === 'ordenar') {
+    const w = x.en.replace(/[.!?]$/, '').split(/\s+/); if (!bien) w.reverse();
+    for (const y of w) await p.evaluate(y => { const b = [...document.querySelectorAll('#v-examen .fichas .ficha')].find(z => z.textContent.toLowerCase() === y.toLowerCase()); if (b) b.click(); }, y);
+  } else if (q.area === 'ingles' && (t === 'traducir' || t === 'dictado')) await p.fill('#ex-texto', bien ? x.en : 'banana banana');
+  else await p.locator('#v-examen .opcion').nth(bien ? x.correcta : (x.correcta + 1) % x.opciones.length).click();
+  await p.locator('#ex-siguiente').click();
+  return q.area + ':' + t;
+}
+module.exports = { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO };

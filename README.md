@@ -20,12 +20,22 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 - **Laboratorio:** editor con colores, ejecución en un hilo aparte (la pantalla nunca se congela y
   se puede detener), consola que pide datos, avisos de fallos típicos y **paso a paso** con las
   variables, la función en curso y la salida de cada momento. Rama extra de HTML con vista previa.
+- **Exámenes de ascenso:** cada rango dice qué debe saber quien lo tiene (código, inglés y habla) y su
+  examen lo evalúa: de 12 a 36 preguntas mezcladas, sin tutor ni pistas, sin saber si aciertas hasta el
+  final, con nota mínima del 70 % al 85 %. Llegar a los puntos solo abre el examen; subir exige aprobarlo.
+  Salir a mitad o cerrar la app cuenta como suspenso. Suspender resta el 10 % de los puntos del rango y
+  deja un repaso obligatorio de lo fallado (con explicaciones); terminado el repaso y recuperados los
+  puntos de antes, se puede repetir.
+- **Habla de programador:** seis bloques (lo básico del código, errores y depuración, Git y revisiones,
+  calidad, producto y equipo, sistemas en producción) con 48 términos en español e inglés y 24
+  situaciones de trabajo: lo que no se dice y cómo lo dice un profesional, en los dos idiomas.
 - **Rangos y puntos:** diez rangos (Aprendiz, Estudiante de código, Pasante, Programador junior,
   Programador, Programador senior, Ingeniero de software, Ingeniero senior, Arquitecto de software e
   Ingeniero de élite, a partir de 30.000 puntos). Acertar suma (más en racha) y fallar resta: un reto de
-  código −5, un ejercicio de inglés −4, una frase mal dicha −2. Si los puntos bajan del mínimo de tu
-  rango, bajas de rango. El laboratorio y las conversaciones no restan. Todos los valores están en
-  `PUNTOS` (`nucleo.js`) y la app los muestra desde ahí.
+  código −5, un ejercicio de inglés o de habla −4, un ejercicio del laboratorio que no pasa −5, una
+  frase mal dicha o una respuesta no entendida en una conversación −2. Si los puntos bajan del mínimo de
+  tu rango, bajas de rango. Todos los valores están en `PUNTOS` y `RANGOS` (`nucleo.js`) y la app los
+  muestra desde ahí.
 - **Inglés para programar:** 12 unidades del A1 al B1 técnico (saludar, leer código en voz alta, el
   teclado, las palabras del código, verbos, explicar código, mensajes de error reales, pedir ayuda,
   commits en pasado, planes, la reunión diaria y documentación): 144 palabras con su pronunciación,
@@ -47,10 +57,12 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 | `ingles.js` | El curso de inglés: 12 unidades, mensajes de error, comparadores tolerantes (mayúsculas, signos, contracciones, números) y el generador de ejercicios. |
 | `nucleo.js` | Lógica sin pantalla: progreso (con validación y migración), puntos y rangos, repaso espaciado, inglés, racha, recomendaciones. |
 | `ui.js` | Piezas visuales: resaltado, editor con colores, cinturones, insignias de rango, celebración, aspecto claro/oscuro. |
+| `habla.js` | Habla de programador: los 6 bloques de términos y situaciones y su generador de ejercicios. |
+| `vista-habla.js`, `vista-examen.js` | Las pantallas de Habla y del examen de ascenso (con su repaso). |
 | `voz.js` | Oír y hablar inglés: voz y dictado de Claude o del navegador, con respaldo sin voz. |
 | `vista-ingles.js` | La pantalla de Inglés: unidades, práctica, hablar y conversación. |
 | `ejecutor.js`, `trabajador.js` | Ejecución en un hilo aparte (Web Worker) con respaldo en la página. |
-| `app.js`, `index.html` | Las pantallas: Hoy, Retos, Inglés, Ruta, Laboratorio y Plan. |
+| `app.js`, `index.html` | Las pantallas: Hoy, Retos, Inglés, Habla, Ruta, Laboratorio, Plan y el examen de ascenso. |
 | `plantillas/` | Service worker (sin internet y actualizaciones) y manifiesto (instalación). |
 | `fuentes/` | IBM Plex Sans/Mono y Zen Kaku Gothic New (licencia OFL), alojadas en la app. |
 | `docs/` | La app montada que sirve GitHub Pages. No se edita a mano: la genera `construir.py`. |
@@ -65,7 +77,8 @@ node pruebas/motor.test.js        # 119 programas y errores típicos en los tres
 node pruebas/contenido.test.js    # miles de retos generados y comprobados con el motor
 node pruebas/soluciones.test.js   # los 20 ejercicios resueltos en los tres lenguajes
 node pruebas/ingles.test.js       # el curso de inglés: contenido, comparadores y miles de ejercicios
-node pruebas/nucleo.test.js       # progreso, migración, puntos y rangos, repaso espaciado, inglés
+node pruebas/habla.test.js        # habla de programador: términos, situaciones y ejercicios
+node pruebas/nucleo.test.js       # progreso, migración, rangos y exámenes, repaso espaciado, inglés y habla
 # en un navegador (Playwright): sirve docs/ en el puerto 8770 y
 node pruebas/e2e.js [carpeta-capturas]
 node pruebas/claude.js            # la versión dentro de Claude, con Claude simulado (también su voz y su dictado)

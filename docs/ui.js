@@ -84,11 +84,12 @@ function bloqueCodigo(codigo, lang, opts = {}) {
     const li = h('li', { html: html || ' ' });
     if (opts.actual === i + 1) li.classList.add('actual');
     if (opts.tocar) {
-      li.classList.add('toca'); li.tabIndex = 0; li.setAttribute('role', 'button'); li.setAttribute('aria-label', 'Línea ' + (i + 1) + ': ' + l.trim());
+      li.classList.add('toca'); li.tabIndex = 0; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', 'false'); li.setAttribute('aria-label', 'Línea ' + (i + 1) + ': ' + l.trim());
       li.addEventListener('click', () => opts.tocar(i, li)); li.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opts.tocar(i, li); } });
     }
     ol.append(li);
   });
+  if (opts.tocar) { ol.setAttribute('role', 'listbox'); ol.setAttribute('aria-label', 'Líneas del programa'); }
   return h('div', { class: 'codigo', role: opts.tocar ? 'group' : null, 'aria-label': 'Código en ' + (NL[lang] || lang) }, ol);
 }
 const salidaBloque = s => s === '' ? h('div', { class: 'salida vacia' }, '(no muestra nada)') : h('div', { class: 'salida' }, s);
@@ -167,9 +168,11 @@ function celebra(i, texto, o = {}) {
     if (antes && antes.focus) antes.focus({ preventScroll: true });
   };
   const tecla = e => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); cierra(); } };
-  const boton = h('button', { class: 'btn primario grande', onclick: cierra }, 'Seguir');
+  const boton = h('button', { class: 'btn primario grande', onclick: cierra }, o.accion ? o.accion.texto : 'Seguir');
+  if (o.accion) boton.addEventListener('click', o.accion.fn);
   const capa = h('div', { class: 'capa', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'celebra-titulo', onclick: e => { if (e.target === capa) cierra(); } },
-    h('div', { class: 'celebra' }, o.figura || cinturon(i, true), h('span', { class: 'etiqueta' }, o.etiqueta || 'Nuevo cinturón'), h('h2', { id: 'celebra-titulo' }, o.titulo || CINTURONES[Math.min(i, 10)].n), h('p', null, texto), boton));
+    h('div', { class: 'celebra' }, o.figura || cinturon(i, true), h('span', { class: 'etiqueta' }, o.etiqueta || 'Nuevo cinturón'), h('h2', { id: 'celebra-titulo' }, o.titulo || CINTURONES[Math.min(i, 10)].n), h('p', null, texto),
+      h('div', { class: 'fila', style: 'justify-content:center' }, boton, o.accion ? h('button', { class: 'btn', onclick: cierra }, 'Luego') : null)));
   document.body.append(capa); document.addEventListener('keydown', tecla); boton.focus();
 }
 const miles = n => Number(n).toLocaleString('es-ES');

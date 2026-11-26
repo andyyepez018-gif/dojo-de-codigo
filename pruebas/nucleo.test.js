@@ -2,6 +2,7 @@
 globalThis.Motor = require('../motor.js');
 const D = require('../contenido.js');
 const I = require('../ingles.js');
+const J = require('../habla.js');
 const N = require('../nucleo.js');
 let bien = 0, mal = 0;
 const ok = (nombre, cond, detalle) => { if (cond) bien++; else { mal++; console.log('✗ ' + nombre + (detalle !== undefined ? ' → ' + JSON.stringify(detalle) : '')); } };
@@ -80,24 +81,73 @@ ok('mínimos crecientes', N.RANGOS.every((r, k) => k === 0 ? r.min === 0 : r.min
 ok('rango con 0 puntos', N.rangoDe(0).i === 0 && N.rangoDe(299).i === 0 && N.rangoDe(300).i === 1, N.rangoDe(300));
 ok('rango máximo', N.rangoDe(30000).i === 9 && N.rangoDe(1e7).siguiente === null && N.rangoDe(1e7).prop === 1);
 ok('faltan y progreso', N.rangoDe(650).faltan === 350 && Math.abs(N.rangoDe(650).prop - 0.5) < 1e-9, N.rangoDe(650));
-const ga = N.normaliza({ v: 2, bienvenida: true, puntos: 295 }, D, I);
+const ga = N.normaliza({ v: 2, bienvenida: true, puntos: 295, examenes: {} }, D, I);
 let rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: true });
-ok('subir de rango avisa «sube»', rr.cambio && rr.cambio.tipo === 'sube' && rr.cambio.i === 1 && ga.rangoMax === 1 && rr.puntos === 10, rr);
-rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: false });
-ok('equivocarse resta 5 y corta la racha', rr.puntos === -5 && ga.combo === 0 && ga.puntos === 300, [rr, ga.puntos]);
-rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: false });
-ok('bajar de rango avisa «baja»', rr.cambio && rr.cambio.tipo === 'baja' && rr.cambio.i === 0 && ga.rangoMax === 1, rr);
-rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: true });
-ok('volver a subir avisa «recupera» (sin fiesta repetida)', rr.cambio && rr.cambio.tipo === 'recupera', [rr, ga.puntos]);
-const g2 = N.normaliza({ v: 2, puntos: 298, rangoMax: 1 }, D, I);
-ok('recupera', N.sumaPuntos(g2, 5).cambio.tipo === 'recupera');
+ok('llegar a los puntos NO sube: abre el examen', rr.cambio && rr.cambio.tipo === 'examen' && rr.cambio.i === 1 && ga.rangoMax === 0 && N.rangoActual(ga).i === 0, rr);
+ok('equivocarse resta 5 y corta la racha', N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: false }).puntos === -5 && ga.combo === 0 && ga.puntos === 300);
+ok('el examen del rango 2 está disponible', N.estadoExamen(ga).disponible && N.estadoExamen(ga).preguntas === 12 && N.estadoExamen(ga).nota === 0.7 && N.estadoExamen(ga).sabe.length === 3);
+const fallosEj = [{ area: 'codigo', spec: { tpl: 'comas', lang: 'py', tipo: 'salida', seed: 7 } }, { area: 'habla', spec: { bloque: 'b1', tipo: 'definicion', seed: 9 } }];
+let rx = N.registraExamen(ga, 1, { bien: 7, total: 12, fallos: fallosEj });
+ok('suspender resta puntos (−50 en el rango 2) y no sube', !rx.aprobado && rx.puntos === -50 && ga.puntos === 250 && ga.rangoMax === 0, rx);
+ok('suspender deja lo fallado para repasar y pide volver a los puntos de antes', N.estadoExamen(ga).repaso === 2 && N.estadoExamen(ga).objetivo === 300 && N.estadoExamen(ga).espera === 50 && !N.estadoExamen(ga).disponible, N.estadoExamen(ga));
+let rp = N.registraRepasoExamen(ga, 0, false);
+ok('repasar mal resta y la pregunta se queda', rp.puntos === -5 && rp.quedan === 2);
+rp = N.registraRepasoExamen(ga, 0, true); N.registraRepasoExamen(ga, 0, true);
+ok('repasar bien la quita (+5)', rp.puntos === 5 && ga.examenes.repaso.length === 0);
+ok('sin los puntos de antes todavía no se puede repetir', !N.estadoExamen(ga).disponible && N.estadoExamen(ga).espera > 0);
+const rs = N.sumaPuntos(ga, N.estadoExamen(ga).espera);
+ok('al recuperar los puntos (y con el repaso hecho) avisa: examen disponible', N.estadoExamen(ga).disponible && rs.cambio && rs.cambio.tipo === 'examen', rs);
+rx = N.registraExamen(ga, 1, { bien: 9, total: 12 });
+ok('aprobar (75 %) sube de rango y da +150', rx.aprobado && rx.cambio.tipo === 'sube' && ga.rangoMax === 1 && N.rangoActual(ga).i === 1 && rx.puntos === 150, rx);
+ok('el historial guarda los dos intentos', ga.examenes.historial.length === 2 && ga.examenes.historial[1].aprobado);
+ok('la multa crece con el rango (10 % del mínimo, al menos 50)', N.multaExamen(1) === 50 && N.multaExamen(2) === 100 && N.multaExamen(9) === 3000);
+const gm = N.normaliza({ puntos: 5000, rangoMax: 0, examenes: {} }, D, I, J); N.registraExamen(gm, 1, { bien: 0, total: 12 });
+ok('con puntos de sobra, para repetir hay que volver a los de antes', gm.puntos === 4950 && N.estadoExamen(gm).objetivo === 5000 && N.estadoExamen(gm).espera === 50);
+ok('abandonar cuenta como suspenso', !N.registraExamen(N.normaliza({ puntos: 400, examenes: {} }, D, I), 1, { bien: 10, total: 10, abandonado: true }).aprobado);
+const gb = N.normaliza({ v: 2, puntos: 302, rangoMax: 1, examenes: {} }, D, I);
+let rb = N.sumaPuntos(gb, -5);
+ok('bajar de los puntos del rango avisa «baja»', rb.cambio && rb.cambio.tipo === 'baja' && rb.cambio.i === 0 && gb.rangoMax === 1, rb);
+rb = N.sumaPuntos(gb, 10);
+ok('volver a subir avisa «recupera», sin repetir el examen', rb.cambio && rb.cambio.tipo === 'recupera' && N.rangoActual(gb).i === 1, rb);
+ok('quien venía de antes conserva su rango sin examen', N.normaliza({ puntos: 5000 }, D, I).rangoMax === 4 && N.normaliza({ puntos: 5000, examenes: {} }, D, I).rangoMax === 0);
+ok('con 5000 puntos y sin exámenes aprobados eres Aprendiz con el examen 2 pendiente', (() => { const x = N.normaliza({ puntos: 5000, examenes: {} }, D, I); return N.rangoActual(x).i === 0 && N.estadoExamen(x).rango === 1 && N.estadoExamen(x).disponible; })());
+ok('cada rango dice qué debe saber (código, inglés y habla)', N.RANGOS.every(R => Array.isArray(R.sabe) && R.sabe.length === 3));
+ok('el repaso guardado se limpia al normalizar', N.normaliza({ examenes: { repaso: [{ area: 'codigo', spec: { tpl: 'comas', lang: 'py', seed: 3 } }, { area: 'x', spec: {} }, { area: 'habla', spec: { bloque: 'b9', seed: 1 } }] } }, D, I, J).examenes.repaso.length === 1);
+ok('cada rango (2 a 10) tiene examen, cada vez más grande y exigente', N.RANGOS.slice(1).every((R, k, a) => R.examen && (k === 0 || (R.examen.preguntas >= a[k - 1].examen.preguntas && R.examen.nota >= a[k - 1].examen.nota && R.examen.temas >= a[k - 1].examen.temas && R.examen.unidades >= a[k - 1].examen.unidades))));
+ok('el último examen cubre los 10 temas, las 12 unidades y los 6 bloques de habla', N.RANGOS[9].examen.temas === 10 && N.RANGOS[9].examen.unidades === 12 && N.RANGOS[9].examen.bloques === 6);
+for (let k = 1; k < 10; k++) {
+  for (const sale of [false, true]) {
+    const plan = N.planExamen(D, I, k, 1234 + k, { sale }, J), R = N.RANGOS[k].examen;
+    const cod = plan.filter(x => x.area === 'codigo'), ing = plan.filter(x => x.area === 'ingles'), hab = plan.filter(x => x.area === 'habla');
+    const temas = new Set(cod.map(x => x.tema)), unidades = new Set(ing.map(x => x.unidad)), bloques = new Set(hab.map(x => x.bloque));
+    ok(`examen ${k + 1}: ${R.preguntas} preguntas de código, inglés y habla`, plan.length === R.preguntas && cod.length && ing.length && hab.length);
+    ok(`examen ${k + 1}: entra todo lo de ese rango y nada de más`, temas.size >= Math.min(R.temas, cod.length - 1) && unidades.size >= Math.min(R.unidades, ing.length - 1) && bloques.size >= Math.min(R.bloques, hab.length - 1)
+      && cod.every(x => D.temas.findIndex(t => t.id === x.tema) < R.temas) && ing.every(x => I.porId[x.unidad].n <= R.unidades) && hab.every(x => J.porId[x.bloque].n <= R.bloques), [temas.size, unidades.size, bloques.size]);
+    ok(`examen ${k + 1}: lo más nuevo del rango siempre entra`, temas.has(D.temas[R.temas - 1].id) && unidades.has(I.unidades[R.unidades - 1].id) && bloques.has(J.bloques[R.bloques - 1].id));
+    ok(`examen ${k + 1}: escuchar solo si hay voz; nunca hablar`, plan.every(x => x.area !== 'ingles' || x.spec.tipo !== 'habla') && (sale || plan.every(x => !['escucha', 'dictado'].includes(x.spec.tipo))));
+    let generadas = 0; for (const x of plan) { try { const g = x.area === 'codigo' ? (D.generar(x.spec) || D.generar({ ...x.spec, tipo: 'salida' })) : x.area === 'ingles' ? I.generar(x.spec, { sale, entra: false }) : J.generar(x.spec); if (g) generadas++; } catch (e) {} }
+    ok(`examen ${k + 1}: todas las preguntas se generan`, generadas === plan.length, generadas);
+  }
+}
+// Habla de programador y fallos que ahora restan
+const hj = N.normaliza({ v: 2, bienvenida: true, puntos: 100 }, D, I, J);
+ok('Habla empieza en el bloque 1', N.bloqueActual(hj, J).id === 'b1');
+let rj = N.registraJerga(hj, J, { bloque: 'b1', item: 'b1:variable', ok: true });
+ok('acierto de habla +8', rj.puntos === 8 && N.leeDia(hj).jerga === 1);
+rj = N.registraJerga(hj, J, { bloque: 'b1', item: 'b1:variable', ok: false });
+ok('fallo de habla −4 y vuelve a repasarse', rj.puntos === -4 && hj.jerga.tarjetas['b1:variable'].caja === 0);
+for (let k = 0; k < 9; k++) N.registraJerga(hj, J, { bloque: 'b1', item: 'b1:bucle', ok: true });
+ok('dominar un bloque pasa al siguiente', N.estadoBloque(hj, J, 'b1').dominado && N.bloqueActual(hj, J).id === 'b2');
+ok('fallar un ejercicio del laboratorio resta 5', N.registraFallo(hj, N.PUNTOS.ejercicioFallo).delta === -5);
+ok('un turno de conversación no entendido resta 2', N.registraFallo(hj, N.PUNTOS.conversaFallo).delta === -2);
+ok('el código de progreso lleva la habla y los exámenes', JSON.stringify(N.leeCodigoProgreso(N.codigoProgreso(hj), D, I, J).jerga) === JSON.stringify(hj.jerga));
 const g3 = N.normaliza({ v: 2, puntos: 3 }, D, I);
 ok('los puntos nunca bajan de 0', N.sumaPuntos(g3, -50).delta === -3 && g3.puntos === 0);
 ok('el día guarda los puntos netos', N.leeDia(g3).puntos === -3, N.leeDia(g3));
 const g4 = N.normaliza({ v: 2, ajustes: { meta: 10 } }, D, I); let tot = 0;
 for (let k = 0; k < 10; k++) tot += N.registraReto(g4, D, { tema: 'salida', tpl: 'comas', lang: 'ps', ok: true }).puntos;
 ok('cumplir la meta da +50', tot === 10 + 11 + 12 + 13 + 14 + 15 * 5 + 50, tot);
-ok('rangoMax no puede quedar por debajo del rango actual', N.normaliza({ puntos: 5000, rangoMax: 0 }, D, I).rangoMax === 4);
+ok('sin exámenes guardados (versión anterior), rangoMax no queda por debajo de los puntos', N.normaliza({ puntos: 5000, rangoMax: 0 }, D, I).rangoMax === 4);
 ok('rangoMax dañado', N.normaliza({ puntos: 0, rangoMax: 99 }, D, I).rangoMax === 9 && N.normaliza({ rangoMax: 'x' }, D, I).rangoMax === 0);
 
 // 7. Inglés

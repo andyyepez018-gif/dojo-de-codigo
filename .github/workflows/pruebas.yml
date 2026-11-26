@@ -23,7 +23,9 @@ jobs:
         run: node pruebas/soluciones.test.js
       - name: Inglés (contenido, comparadores y miles de ejercicios generados)
         run: node pruebas/ingles.test.js
-      - name: Núcleo (progreso, puntos y rangos, repaso espaciado, inglés)
+      - name: Habla de programador (términos y situaciones)
+        run: node pruebas/habla.test.js
+      - name: Núcleo (progreso, rangos, exámenes, repaso espaciado, inglés y habla)
         run: node pruebas/nucleo.test.js
       - name: docs/ está al día con el código
         run: python3 construir.py --sin-pruebas && git diff --exit-code -- docs

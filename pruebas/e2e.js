@@ -25,7 +25,7 @@ async function responderReto(p) {
   return 'nada';
 }
 const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
-const { vozFalsa, resuelveIngles, cierraFiesta, CURSO } = require('./robot-ingles.js');
+const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = require('./robot-ingles.js');
 
 (async () => {
   const b = await chromium.launch();
@@ -194,14 +194,14 @@ const { vozFalsa, resuelveIngles, cierraFiesta, CURSO } = require('./robot-ingle
   for (let k = 0; k < 14; k++) {
     const t = await resuelveIngles(p, true); tiposIngles.add(t);
     if (!(await p.locator('#v-ingles .respuesta.si').count())) { sumaOk = false; console.log('     no aceptó la respuesta buena de', t, await p.textContent('#v-ingles .ejercicio')); }
-    if (await p.locator('.capa').count()) { fiesta = fiesta || /Nuevo rango/.test(await p.textContent('.capa')); if (k === 2 || fiesta) await p.screenshot({ path: path.join(CAPTURAS, '12-nuevo-rango.png') }); await cierraFiesta(p); }
+    if (await p.locator('.capa').count()) { fiesta = fiesta || /Examen de ascenso disponible/.test(await p.textContent('.capa')); if (k === 2 || fiesta) await p.screenshot({ path: path.join(CAPTURAS, '12-nuevo-rango.png') }); await cierraFiesta(p); }
     await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
   }
   console.log('     tipos de inglés vistos:', [...tiposIngles].join(', '));
   ok('el alumno robot acierta todos los tipos que salen', sumaOk);
   ok('al empezar una unidad sale primero el vocabulario', [...tiposIngles].every(t => ['significado', 'palabra', 'escucha'].includes(t)) || tiposIngles.size > 3);
   ok('al responder se oye la palabra o la frase', await p.evaluate(() => window.__dicho.length >= 10));
-  ok('subir de 300 puntos celebra el rango «Estudiante de código»', fiesta && /Estudiante de código/.test(await p.textContent('#rango-lateral')));
+  ok('llegar a 300 puntos abre el examen de «Estudiante de código», pero no sube solo', fiesta && /Aprendiz/.test(await p.textContent('#rango-lateral')));
   // forzar frases (unidad con ejercicios ya hechos): practicar la unidad 1 hasta ver frases y el micrófono
   const vistosFrase = new Set();
   for (let k = 0; k < 30 && !(vistosFrase.has('habla') && vistosFrase.has('ordenar') && vistosFrase.size >= 4); k++) {
@@ -275,10 +275,92 @@ const { vozFalsa, resuelveIngles, cierraFiesta, CURSO } = require('./robot-ingle
   ok('fuera de Claude ofrece copiar la instrucción para el modo de voz de Claude', await p.getByRole('button', { name: 'Copiar la instrucción para Claude' }).count() === 1);
   await c.close();
 
+  console.log('13. Examen de ascenso: aprobar, suspender y abandonar');
+  const modoPruebas = () => { localStorage.setItem('dojo-pruebas', '1'); };
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 1100, examenes: {} }, modoPruebas));
+  await p.goto(URL + '#hoy'); await p.waitForSelector('.rango-tarjeta');
+  ok('con los puntos pero sin examen sigues en Aprendiz', /Aprendiz/.test(await p.textContent('#rango-lateral')) && /Examen para «Estudiante de código»/.test(await p.textContent('.siguiente')));
+  await p.locator('.rango-tarjeta').getByRole('button', { name: /Hacer el examen/ }).click(); await p.waitForSelector('#ex-empezar');
+  ok('la portada del examen dice qué debe saber, qué entra y las reglas', /Lo que debe saber un Estudiante de código/.test(await p.textContent('#v-examen')) && /Lo básico del código/.test(await p.textContent('#v-examen')) && /12 preguntas/.test(await p.textContent('#v-examen')) && /Sin ninguna ayuda/.test(await p.textContent('#v-examen')) && /Mostrar en pantalla/.test(await p.textContent('#v-examen')) && /Hola, soy programador/.test(await p.textContent('#v-examen')));
+  await p.screenshot({ path: path.join(CAPTURAS, '17-examen-portada.png') });
+  await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
+  ok('durante el examen no hay tutor, ni paso a paso, ni laboratorio', await p.locator('#v-examen').getByRole('button', { name: /Explícamelo|Copiar la pregunta|Paso a paso|laboratorio/i }).count() === 0);
+  const vistosEx = new Set(); let sinPista = true;
+  for (let k = 0; k < 12; k++) {
+    if (await p.locator('#v-examen .respuesta, #v-examen .correcta, #v-examen .fallada').count()) sinPista = false;
+    vistosEx.add(await resuelveExamen(p, true)); if (k === 3) await p.screenshot({ path: path.join(CAPTURAS, '18-examen-pregunta.png') });
+  }
+  console.log('     preguntas vistas:', [...vistosEx].join(', '));
+  ok('no dice si aciertas hasta el final', sinPista);
+  ok('mezcla código, inglés y habla de programador', [...vistosEx].some(x => x.startsWith('codigo')) && [...vistosEx].some(x => x.startsWith('ingles')) && [...vistosEx].some(x => x.startsWith('habla')));
+  await p.waitForSelector('.resultado-examen');
+  ok('todo bien: aprobado con 100 %', /Aprobado/.test(await p.textContent('.resultado-examen')) && /100 %/.test(await p.textContent('.resultado-examen')), await p.textContent('.resultado-examen'));
+  ok('al aprobar celebra el rango nuevo', await p.locator('.capa').count() === 1 && /Nuevo rango/.test(await p.textContent('.capa')) && /Estudiante de código/.test(await p.textContent('.capa')));
+  await p.screenshot({ path: path.join(CAPTURAS, '19-examen-aprobado.png') }); await cierraFiesta(p);
+  ok('ya eres Estudiante de código (+150 puntos)', /Estudiante de código/.test(await p.textContent('#rango-lateral')) && /1250 puntos/.test(await p.textContent('#rango-lateral')));
+  // el siguiente (Pasante, 1000 puntos) ya está disponible: suspenderlo
+  await p.locator('#menu-lateral a[href="#hoy"]').click(); await pausa(250); await p.goto(URL + '#examen'); await p.waitForSelector('#ex-empezar'); await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
+  ok('el examen de Pasante tiene 14 preguntas', /Pregunta 1 de 14/.test(await p.textContent('#v-examen')));
+  for (let k = 0; k < 14; k++) await resuelveExamen(p, k < 6);
+  await p.waitForSelector('.resultado-examen');
+  ok('6 de 14: suspendido, sin subir y −100 puntos', /Suspendido/.test(await p.textContent('.resultado-examen')) && /−100 puntos/.test(await p.textContent('.resultado-examen')) && /Estudiante de código/.test(await p.textContent('#rango-lateral')) && /1150 puntos/.test(await p.textContent('#rango-lateral')) && /Lo que fallaste \(8\)/.test(await p.textContent('#v-examen')), await p.textContent('#v-examen'));
+  await p.screenshot({ path: path.join(CAPTURAS, '20-examen-suspendido.png'), fullPage: true });
+  await p.locator('#menu-lateral a[href="#hoy"]').click(); await pausa(250); await p.goto(URL + '#examen'); await p.waitForSelector('#v-examen .examen-intro');
+  ok('tras suspender no se puede repetir: primero el repaso de lo fallado', await p.locator('#ex-empezar').count() === 0 && /primero repasa las 8 preguntas/.test(await p.textContent('#v-examen')));
+  await p.click('#ex-repasar'); await p.waitForSelector('#v-examen .pregunta');
+  ok('el repaso enseña la respuesta (aquí sí hay ayuda)', /Quedan 8/.test(await p.textContent('#v-examen')));
+  await resuelveExamen(p, false); await p.waitForSelector('#v-examen .respuesta');
+  ok('fallar en el repaso resta y la pregunta se queda', /se queda en el repaso/.test(await p.textContent('#v-examen .respuesta')) && /−5 puntos/.test(await p.textContent('#v-examen .respuesta')));
+  await p.screenshot({ path: path.join(CAPTURAS, '21-repaso-examen.png'), fullPage: true });
+  for (let k = 0; k < 20 && await p.locator('#v-examen .pregunta').count(); k++) {
+    if (await p.locator('#v-examen .respuesta').count()) { await p.click('#ex-siguiente'); await pausa(80); continue; }
+    await resuelveExamen(p, true); await p.waitForSelector('#v-examen .respuesta');
+  }
+  await p.waitForSelector('#v-examen .examen-intro');
+  ok('repaso hecho: ahora hay que volver a los puntos de antes', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).examenes.repaso.length === 0) && /Vuelve a tus 1250 puntos/.test(await p.textContent('#v-examen')) && await p.locator('#ex-empezar').count() === 0, await p.textContent('#v-examen'));
+  await c.close();
+  // abandonar: cambiar de pantalla o recargar a mitad cuenta como suspenso
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {} }, modoPruebas));
+  await p.goto(URL + '#examen'); await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
+  await resuelveExamen(p, true); await p.locator('#menu-lateral a[href="#retos"]').click(); await pausa(300);
+  ok('salir a mitad: suspendido, resta puntos y lo avisa', /cuenta como suspendido/.test(await p.textContent('#aviso')) && /Aprendiz/.test(await p.textContent('#rango-lateral')) && /350 puntos/.test(await p.textContent('#rango-lateral')));
+  ok('el intento abandonado queda en el historial', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).examenes.historial.at(-1).abandonado === true));
+  await c.close();
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 400, examenes: {} }, modoPruebas));
+  await p.goto(URL + '#examen'); await p.click('#ex-empezar'); await p.waitForSelector('#v-examen .pregunta');
+  await p.reload(); await p.waitForSelector('.portada, .examen-intro, .rango-tarjeta').catch(() => {}); await pausa(400);
+  ok('recargar a mitad también cuenta como suspenso', await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('dojo-progreso')); return d.examenes.historial.length === 1 && d.examenes.historial[0].abandonado && d.rangoMax === 0 && d.puntos === 350 && d.examenes.repaso.length === 12; }));
+  await c.close();
+
+  console.log('14. Habla de programador y fallos que restan');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 500, examenes: {} }));
+  await p.goto(URL + '#habla'); await p.waitForSelector('.portada-habla');
+  ok('la pestaña Habla muestra los 6 bloques', await p.locator('#v-habla .tema').count() === 6 && await p.locator('#menu-lateral a[href="#habla"]').count() === 1);
+  await p.locator('#v-habla .tema').first().click();
+  ok('el bloque enseña términos en español e inglés y la forma profesional', /variable/.test(await p.textContent('#v-habla .glosario')) && /return value/.test(await p.textContent('#v-habla .glosario')) && await p.locator('#v-habla .bien-dicho').count() === 4 && await p.locator('#v-habla .mal-dicho').count() === 4);
+  await p.screenshot({ path: path.join(CAPTURAS, '22-habla-bloque.png'), fullPage: true });
+  await p.getByRole('button', { name: 'Practicar este bloque' }).click(); await p.waitForSelector('#v-habla .ejercicio');
+  const J = require('../habla.js'); let bienH = 0, malH = 0;
+  for (let k = 0; k < 8; k++) {
+    const op = await p.evaluate(() => { const b = [...document.querySelectorAll('#v-habla .opcion')]; return b.length; });
+    await p.locator('#v-habla .opcion').nth(k % op).click(); await p.waitForSelector('#v-habla .respuesta');
+    if (await p.locator('#v-habla .respuesta.si').count()) bienH++; else malH++;
+    await cierraFiesta(p); await p.click('#hab-siguiente'); await p.waitForSelector('#v-habla .ejercicio');
+  }
+  ok('la práctica de habla corrige, suma y resta', bienH + malH === 8 && await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).dias[Object.keys(JSON.parse(localStorage.getItem('dojo-progreso')).dias)[0]].jerga === 8));
+  await p.screenshot({ path: path.join(CAPTURAS, '23-habla-practica.png') });
+  await p.goto(URL + '#lab'); await p.waitForSelector('#v-lab');
+  const antesLab = await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).puntos);
+  const botonComprobar = p.getByRole('button', { name: /Comprobar/ });
+  if (!(await botonComprobar.count())) { await p.goto(URL + '#ruta'); await p.locator('.tema').first().click(); await p.getByRole('button', { name: /Resolver/ }).first().click(); await p.waitForSelector('#editor-codigo'); }
+  await p.fill('#editor-codigo', 'Escribir "mal"'); await p.getByRole('button', { name: /Comprobar/ }).click(); await pausa(800);
+  ok('un ejercicio del laboratorio que no pasa resta 5 puntos', await p.evaluate(() => JSON.parse(localStorage.getItem('dojo-progreso')).puntos) === antesLab - 5);
+  await c.close();
+
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');
   for (const esquema of ['light', 'dark']) {
     ({ c, p } = await nueva(b, { ...devices['iPhone 13'], colorScheme: esquema }, { v: 2, bienvenida: true }));
-    for (const v of ['hoy', 'retos', 'ingles', 'ruta', 'lab', 'plan']) {
+    for (const v of ['hoy', 'retos', 'ingles', 'habla', 'ruta', 'lab', 'plan', 'examen']) {
       await p.goto(URL + '#' + v); await pausa(250);
       ok(`móvil ${esquema} · ${v} sin desbordar`, await sinDesbordar(p));
       if (esquema === 'dark' && (v === 'hoy' || v === 'retos' || v === 'lab' || v === 'ingles')) await p.screenshot({ path: path.join(CAPTURAS, `08-movil-${v}.png`) });

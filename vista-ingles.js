@@ -160,7 +160,7 @@ raiz.VistaIngles = function (ctx) {
     else if (e.tipo === 'ordenar') {
       const quedan = e.fichas.map((t, k) => k).filter(k => !st.armado.includes(k));
       partes.push(h('h2', null, 'Ordena la frase'), h('p', null, 'En inglés: «', h('b', null, e.es), '»'),
-        h('div', { class: 'armado fichas-armadas', 'aria-label': 'Tu frase', lang: 'en' }, ...st.armado.map((k, j) => h('button', { class: 'ficha', disabled: st.respondido || null, 'aria-label': 'Quitar ' + e.fichas[k], onclick: () => { st.armado.splice(j, 1); PINTA(); } }, e.fichas[k]))));
+        h('div', { class: 'armado fichas-armadas', role: 'group', 'aria-label': 'Tu frase', lang: 'en' }, ...st.armado.map((k, j) => h('button', { class: 'ficha', disabled: st.respondido || null, 'aria-label': 'Quitar ' + e.fichas[k], onclick: () => { st.armado.splice(j, 1); PINTA(); } }, e.fichas[k]))));
       if (!st.respondido) partes.push(
         h('div', { class: 'fichas', lang: 'en' }, ...quedan.map(k => h('button', { class: 'ficha', 'aria-label': 'Añadir ' + e.fichas[k], onclick: () => { st.armado.push(k); PINTA(); } }, e.fichas[k]))),
         e.sobran ? h('p', { class: 'tenue', style: 'font-size:13px' }, `Sobran ${e.sobran} palabras.`) : null,
@@ -231,6 +231,7 @@ raiz.VistaIngles = function (ctx) {
     c.log.push({ quien: 'yo', texto: alternativas[0] || r.oido, ok: bien }); c.ejemplo = false;
     if (bien) { c.bien++; avanza(); return; }
     c.intentos++;
+    const f = N.registraFallo(P.d, N.PUNTOS.conversaFallo); trataPuntos(f, false); c.log[c.log.length - 1].puntos = f.delta;
     if (c.intentos >= 2) { c.log.push({ quien: 'nota', texto: `Seguimos. Una forma de decirlo: «${t.ejemplo}»` }); avanza(); }
     else { c.log.push({ quien: 'nota', texto: `No te entendí del todo. ${t.es} Prueba otra vez.` }); PINTA(); }
   }
@@ -249,7 +250,7 @@ raiz.VistaIngles = function (ctx) {
       ? h('li', { class: 'nota' }, m.texto)
       : h('li', { class: 'burbuja ' + (m.quien === 'yo' ? 'yo' : 'ella') + (m.quien === 'yo' ? (m.ok ? ' bien' : ' mal') : '') },
         h('span', { class: 'quien' }, m.quien === 'yo' ? 'Tú' : m.quien === 'claude' ? 'Claude' : 'Compañero'),
-        h('span', { lang: 'en' }, m.texto), m.quien !== 'yo' && Voz.sale ? botonOir(m.texto, 'Escuchar otra vez') : null,
+        h('span', { lang: 'en' }, m.texto), m.puntos ? h('small', { class: 'correccion' }, `${m.puntos} puntos`) : null, m.quien !== 'yo' && Voz.sale ? botonOir(m.texto, 'Escuchar otra vez') : null,
         m.es ? h('small', { class: 'correccion' }, m.es) : null)));
   }
   function entradaChat(al, id) {
@@ -265,7 +266,7 @@ raiz.VistaIngles = function (ctx) {
     if (c.fin) {
       partes.push(h('div', { class: 'respuesta ' + (c.fin.completa ? 'si' : 'no'), role: 'status' },
         h('div', { class: 'entre' }, h('h3', null, c.fin.completa ? 'Conversación completada' : 'Casi: te faltó responder bien algunos turnos'), c.fin.completa ? chipPuntos(c.fin) : null),
-        h('p', null, c.fin.completa ? `Respondiste bien ${c.bien} de ${u.dialogo.length}. ${c.fin.primera ? 'Esta conversación cuenta para dominar la unidad.' : 'Repetirla te da soltura.'}` : `Respondiste bien ${c.bien} de ${u.dialogo.length}. Para que cuente, hay que acertar todos menos uno. Repásala: las conversaciones no restan puntos.`),
+        h('p', null, c.fin.completa ? `Respondiste bien ${c.bien} de ${u.dialogo.length}. ${c.fin.primera ? 'Esta conversación cuenta para dominar la unidad.' : 'Repetirla te da soltura.'}` : `Respondiste bien ${c.bien} de ${u.dialogo.length}. Para que cuente, hay que acertar todos menos uno. Repásala: cada respuesta no entendida resta 2 puntos.`),
         h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => conversar(u.id) }, 'Otra vez'), h('button', { class: 'btn', onclick: () => { st.modo = 'inicio'; PINTA(); } }, 'Volver a Inglés'))));
     } else {
       partes.push(h('div', { class: 'pista-chat' }, h('b', null, 'Qué responder: '), t.es, ' ',

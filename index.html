@@ -62,7 +62,7 @@ a { color: var(--ai); }
 .principal { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 110px; min-width: 0; }
 .columna { max-width: 780px; margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
 .pestanas { position: fixed; inset: auto 0 0 0; z-index: 25; background: var(--superficie); border-top: 1px solid var(--linea);
-  display: grid; grid-template-columns: repeat(6, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: grid; grid-template-columns: repeat(7, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .pestanas a, .lateral nav a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 9px; color: var(--tinta-3); text-decoration: none; font-size: 11.5px; font-weight: 500; }
 .pestanas a[aria-current="page"], .lateral nav a[aria-current="page"] { color: var(--ai); }
@@ -220,6 +220,32 @@ details.desplegable[open] { display: grid; gap: 14px; }
 .correccion { color: var(--kihada); font-size: 13.5px; }
 .pista-chat { background: var(--kihada-suave); border-radius: 10px; padding: 10px 12px; font-size: 14.5px; }
 .entrada-chat .campo { flex: 1 1 200px; min-width: 0; }
+/* Examen */
+.opcion[aria-pressed="true"] { border-color: var(--ai); background: var(--ai-suave); box-shadow: inset 0 0 0 1px var(--ai); }
+.tarjeta > .btn { justify-self: start; }
+.codigo li.elegida { background: rgba(143, 169, 242, .28); box-shadow: inset 3px 0 0 var(--pz-kw); }
+.escalera small.requisito, .escalera small.sabe-rango { color: var(--tinta-3); font-size: 12px; }
+.tres-col { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .tres-col { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.lista.sabe li::marker { color: var(--bien); }
+.situacion { background: var(--hundido); border-radius: 8px; padding: 10px 12px; }
+.tapa-pregunta { opacity: .75; pointer-events: none; display: grid; gap: 12px; }
+.glosario, .situaciones { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.glosario li, .situaciones li { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--linea); }
+.glosario li:last-child, .situaciones li:last-child { border-bottom: 0; padding-bottom: 0; }
+.mal-dicho { color: var(--mal); text-decoration: line-through; text-decoration-thickness: 1px; }
+.mal-dicho::before { content: "✗ "; text-decoration: none; display: inline-block; }
+.bien-dicho { color: var(--bien); font-weight: 600; }
+.bien-dicho::before { content: "✓ "; }
+.resultado-examen h1 { font-size: clamp(24px, 5vw, 30px); font-weight: 900; }
+.resultado-examen.aprobado { border-color: var(--bien); background: var(--bien-suave); }
+.resultado-examen.aprobado h1 { color: var(--bien); }
+.resultado-examen.suspendido { border-color: var(--mal); }
+.resultado-examen.suspendido h1 { color: var(--mal); }
+.nota-examen { font: 900 40px/1 var(--f-titulo); }
+.nota-examen small { font: 500 15px var(--f-texto); color: var(--tinta-2); }
+.repaso-examen { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
+.repaso-examen li { display: grid; gap: 2px; }
 .semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 110px; }
 .semana .dia { display: grid; grid-template-rows: 1fr auto; gap: 4px; height: 100%; text-align: center; font-size: 11.5px; color: var(--tinta-3); }
 .semana .dia span { align-self: end; background: var(--ai-suave); border-radius: 5px 5px 2px 2px; min-height: 3px; position: relative; }
@@ -394,7 +420,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 
 <div class="app">
   <aside class="lateral" aria-label="Menú">
-    <a class="marca" href="#hoy"><span class="sello" aria-hidden="true">道</span><span><b>Dojo de código</b><small>PSeInt · Python · C++ · Inglés</small></span></a>
+    <a class="marca" href="#hoy"><span class="sello" aria-hidden="true">道</span><span><b>Dojo de código</b><small>Código · Inglés · Habla</small></span></a>
     <div class="rango-mini" id="rango-lateral"></div>
     <button class="btn primario chico boton-instalar" hidden>Instalar la app</button>
     <nav id="menu-lateral"></nav>
@@ -411,9 +437,11 @@ details.desplegable[open] { display: grid; gap: 14px; }
       <section id="v-hoy" data-vista="hoy"></section>
       <section id="v-retos" data-vista="retos" hidden></section>
       <section id="v-ingles" data-vista="ingles" hidden></section>
+      <section id="v-habla" data-vista="habla" hidden></section>
       <section id="v-ruta" data-vista="ruta" hidden></section>
       <section id="v-lab" data-vista="lab" hidden></section>
       <section id="v-plan" data-vista="plan" hidden></section>
+      <section id="v-examen" data-vista="examen" hidden></section>
     </div>
   </main>
   <nav class="pestanas" id="menu-pestanas" aria-label="Secciones"></nav>
@@ -424,9 +452,12 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="motor.js"></script>
 <script src="contenido.js"></script>
 <script src="ingles.js"></script>
+<script src="habla.js"></script>
 <script src="nucleo.js"></script>
 <script src="ui.js"></script>
 <script src="ejecutor.js"></script>
 <script src="voz.js"></script>
 <script src="vista-ingles.js"></script>
+<script src="vista-habla.js"></script>
+<script src="vista-examen.js"></script>
 <script src="app.js"></script>
