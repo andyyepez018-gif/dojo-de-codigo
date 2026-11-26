@@ -164,6 +164,32 @@ function repintar() { U.aplicaAspecto(P.d.ajustes.aspecto); aplicaTemaCodigo(); 
 /* ───────────── La espera de Claude y el bloque de foco ───────────── */
 let espera = ls.get('espera', null);   // { inicio, retos }
 let foco = ls.get('foco', null);       // { inicio, minutos }
+/* Sesiones según el tiempo que tengas: 5 minutos (retos y repasos) o 20 (un poco de todo).
+   «Una hora» es el bloque de foco de 60 minutos. Sirven en cualquier momento, no solo esperando a Claude. */
+let sesion = ls.get('sesion', null);   // { tipo, inicio, minutos, base, cumplida }
+if (sesion && Date.now() - sesion.inicio > (sesion.minutos + 30) * 60e3) { sesion = null; ls.set('sesion', null); }
+const SESIONES = {
+  corta: { minutos: 5, n: 'Sesión de 5 minutos', metas: [['retos', 'Retos', 5, 'retos']] },
+  media: { minutos: 20, n: 'Sesión de 20 minutos', metas: [['retos', 'Retos', 8, 'retos'], ['ingles', 'Inglés', 5, 'ingles'], ['jerga', 'Habla', 5, 'habla']] }
+};
+const hechosSesion = () => { const x = N.leeDia(P.d), b = sesion.base; return { retos: x.retos - b.retos, ingles: x.ingles - b.ingles, jerga: x.jerga - b.jerga }; };
+function empiezaSesion(tipo) {
+  if (tipo === 'larga') { empiezaFoco(60); return; }
+  if (foco) { aviso('Estás en un bloque de foco: termínalo primero.'); return; }
+  if (espera) terminaEspera(true);
+  const x = N.leeDia(P.d);
+  sesion = { tipo, inicio: Date.now(), minutos: SESIONES[tipo].minutos, base: { retos: x.retos, ingles: x.ingles, jerga: x.jerga }, cumplida: false };
+  ls.set('sesion', sesion); pintaBandas();
+  if (tipo === 'corta' && N.pendientes(P.d, D).length >= 3) { P.d.ajustes.tema = 'repaso'; P.cambio(); aviso('Empezamos por tus repasos de hoy: es lo que más rinde en 5 minutos.', 4000); }
+  nuevoReto(); ir('retos');
+}
+function terminaSesion(porTiempo) {
+  if (!sesion) return;
+  const x = hechosSesion(), min = Math.max(1, Math.round((Date.now() - sesion.inicio) / 60e3));
+  sesion = null; ls.set('sesion', null); pintaBandas();
+  aviso(`${porTiempo ? 'Tiempo cumplido' : 'Sesión terminada'}: ${x.retos} ${x.retos === 1 ? 'reto' : 'retos'}, ${x.ingles} de inglés y ${x.jerga} de habla en ${min} min.`, 6000);
+  if (vista === 'hoy') PINTA.hoy();
+}
 if (espera && Date.now() - espera.inicio > 90 * 60e3) { espera = null; ls.set('espera', null); }
 const hechosHoy = () => { const x = N.leeDia(P.d); return x.retos + x.ingles; };
 function empiezaEspera(adonde = 'retos') {
@@ -180,11 +206,14 @@ function terminaEspera(convertida) {
   else aviso('Anotado, sin castigo. Lo importante es darse cuenta. A la próxima.');
   if (vista === 'hoy') PINTA.hoy();
 }
-function empiezaFoco() {
+function empiezaFoco(minutos) {
   if (espera) terminaEspera(true);
-  foco = { inicio: Date.now(), minutos: P.d.ajustes.foco }; ls.set('foco', foco); pintaBandas();
+  if (sesion) terminaSesion(false);
+  foco = { inicio: Date.now(), minutos: minutos || P.d.ajustes.foco }; ls.set('foco', foco); pintaBandas();
   if (navigator.wakeLock) navigator.wakeLock.request('screen').catch(() => {});
-  abrirTema(temaActual().id);
+  const ex = N.estadoExamen(P.d);
+  if (minutos >= 60 && ex && ex.puntosOk && !ex.proyectoHecho && N.rangoActual(P.d).i === P.d.rangoMax) { aviso('Una hora da para avanzar tu proyecto del rango.', 4000); VE.abreProyecto(); }
+  else abrirTema(temaActual().id);
 }
 function terminaFoco(completo) {
   if (!foco) return;
@@ -195,7 +224,14 @@ function terminaFoco(completo) {
 }
 function pintaBandas() {
   const el = $('#bandas'); el.textContent = '';
-  if (foco) {
+  if (sesion && !foco) {
+    const S = SESIONES[sesion.tipo];
+    el.append(h('div', { class: 'banda sesion', role: 'status' },
+      h('span', { class: 'reloj', id: 'reloj-sesion' }, '--:--'),
+      h('span', { class: 'texto' }, h('b', null, S.n), ' · ', h('span', { id: 'texto-sesion' }, '')),
+      h('span', { class: 'fila', style: 'gap:6px' }, ...S.metas.map(([k, n, , v]) => h('button', { class: 'btn chico', id: 'ses-' + k, onclick: () => (v === 'retos' ? ir('retos') : v === 'ingles' ? VI.practicar() : VH.practicar()) }, n))),
+      h('button', { class: 'btn chico', onclick: () => terminaSesion(false) }, 'Terminar')));
+  } else if (foco) {
     el.append(h('div', { class: 'banda foco', role: 'status' },
       h('span', { class: 'reloj', id: 'reloj-foco' }, '--:--'),
       h('span', { class: 'texto' }, h('b', null, 'Bloque de foco'), ' · sin mirar a Claude.'),
@@ -210,6 +246,15 @@ function pintaBandas() {
   tic();
 }
 function tic() {
+  if (sesion && !foco) {
+    const S = SESIONES[sesion.tipo], quedan = sesion.minutos * 60 - (Date.now() - sesion.inicio) / 1000, x = hechosSesion();
+    if (quedan <= 0) { terminaSesion(true); return; }
+    const r = $('#reloj-sesion'); if (r) r.textContent = mmss(quedan);
+    for (const [k, n, meta] of S.metas) { const b = $('#ses-' + k); if (b) b.textContent = `${n} ${Math.min(x[k], meta)}/${meta}${x[k] >= meta ? ' ✓' : ''}`; }
+    const t = $('#texto-sesion'), cumplida = S.metas.every(([k, , meta]) => x[k] >= meta);
+    if (t) t.textContent = cumplida ? '¡Hecho! Sigue si quieres' : 'cuando acabe el tiempo, te aviso';
+    if (cumplida && !sesion.cumplida) { sesion.cumplida = true; ls.set('sesion', sesion); aviso('Sesión cumplida. Si te queda tiempo, sigue; si no, ¡bien hecho!', 4500); }
+  }
   if (espera) {
     const r = $('#reloj-espera'); if (r) r.textContent = mmss((Date.now() - espera.inicio) / 1000);
     const t = $('#texto-espera'); const n = hechosHoy() - espera.retos;
@@ -270,26 +315,29 @@ function tarjetaBienvenida() {
     h('span', { class: 'etiqueta' }, 'Bienvenido al Dojo'),
     h('h1', { id: 'bienvenida-t' }, 'Aprende a programar en los ratos muertos'),
     h('ol', { class: 'pasos' },
-      h('li', null, h('b', null, 'En cada espera de Claude, '), 'pulsa «Sí · empezar retos» y responde retos de 30 segundos hasta que te conteste.'),
+      h('li', null, h('b', null, 'En cualquier rato libre, '), 'elige cuánto tiempo tienes (5 minutos, 20 o una hora) y el Dojo te prepara la práctica. Y cada vez que le escribas a Claude, practica hasta que te conteste en vez de abrir TikTok.'),
       h('li', null, h('b', null, 'Una vez al día, '), 'haz un bloque de foco: lee la lección y escribe el ejercicio en el laboratorio.'),
       h('li', null, h('b', null, 'Cada acierto suma puntos y cada fallo resta. '), 'Con los puntos se abre el examen de cada rango; apruébalo sin ayuda y subes. Son diez rangos, de Aprendiz a Ingeniero de élite. Y cada tema que dominas te da un cinturón.'),
       h('li', null, h('b', null, 'Y también inglés: '), 'el que usan los programadores, desde cero, para entenderlo y hablarlo.')),
     h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Qué quieres practicar'), chips('lang', [['mezcla', 'Los tres'], ['ps', 'PSeInt'], ['py', 'Python'], ['cpp', 'C++']])),
     h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Retos al día'), chips('meta', [[10, '10'], [20, '20'], [30, '30']])),
-    h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => { P.d.bienvenida = true; P.cambio(); PINTA.hoy(); aviso('Listo. Ahora, cada vez que le escribas a Claude, vuelve aquí.'); } }, 'Empezar')));
+    h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => { P.d.bienvenida = true; P.cambio(); PINTA.hoy(); aviso('Listo. Cada rato libre, y cada vez que le escribas a Claude, vuelve aquí.'); } }, 'Empezar')));
 }
 PINTA.hoy = function () {
   const el = $('#v-hoy'); el.textContent = '';
   if (!P.d.bienvenida) { el.append(h('div', { class: 'columna' }, tarjetaBienvenida())); return; }
   const d = N.leeDia(P.d), meta = P.d.ajustes.meta, metaI = P.d.ajustes.metaIngles, t = temaActual(), et = est(t.id), i = dominados();
+  const boton = (tipo, titulo, sub) => h('button', { class: 'btn tiempo', onclick: () => empiezaSesion(tipo) }, h('b', null, titulo), h('small', null, sub));
   const portada = h('div', { class: 'portada' },
     h('span', { class: 'kanji', 'aria-hidden': 'true' }, '道'),
-    h('span', { class: 'etiqueta', style: 'color:inherit;opacity:.85' }, espera ? 'Claude está trabajando' : foco ? 'Bloque de foco en marcha' : 'Tu regla'),
-    h('h1', null, espera ? 'Sigue con los retos hasta que responda' : foco ? 'Ahora toca escribir código' : '¿Le acabas de escribir a Claude?'),
-    h('p', null, espera ? 'Cuando Claude termine, toca «Claude ya respondió» arriba y vuelve con él.' : foco ? 'Abre la lección del tema actual y resuelve su ejercicio en el laboratorio.' : 'Mientras trabaja, haz retos de 30 segundos aquí en vez de abrir TikTok. Cuando responda, vuelves con él.'),
+    h('span', { class: 'etiqueta', style: 'color:inherit;opacity:.85' }, espera ? 'Claude está trabajando' : foco ? 'Bloque de foco en marcha' : sesion ? 'Sesión en marcha' : 'Practicar ahora'),
+    h('h1', null, espera ? 'Sigue con los retos hasta que responda' : foco ? 'Ahora toca escribir código' : sesion ? 'Lo tienes en la barra de arriba' : '¿Cuánto tiempo tienes?'),
+    h('p', null, espera ? 'Cuando Claude termine, toca «Claude ya respondió» arriba y vuelve con él.' : foco ? 'Abre la lección del tema actual (o tu proyecto) y escribe código con calma.' : sesion ? 'Toca Retos, Inglés o Habla en la barra para ir a cada parte. Te aviso cuando acabe el tiempo.' : 'Elige y el Dojo te prepara la práctica. En el bus, en una fila, antes de dormir o mientras Claude trabaja.'),
     espera ? h('button', { class: 'btn primario grande', onclick: () => ir('retos') }, 'Seguir con los retos')
       : foco ? h('button', { class: 'btn primario grande', onclick: () => abrirTema(t.id) }, 'Abrir la lección')
-      : h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => empiezaEspera('retos') }, 'Sí · empezar retos'), h('button', { class: 'btn secundario', onclick: () => empiezaEspera('ingles') }, 'O practicar inglés')));
+      : sesion ? h('button', { class: 'btn primario grande', onclick: () => ir('retos') }, 'Seguir practicando')
+      : h('div', { class: 'pila' }, h('div', { class: 'tiempos' }, boton('corta', '5 minutos', 'Retos y repasos'), boton('media', '20 minutos', 'Retos, inglés y habla'), boton('larga', '1 hora', 'Lección, laboratorio o proyecto')),
+          h('div', { class: 'fila' }, h('button', { class: 'btn secundario', onclick: () => empiezaEspera('retos') }, 'Le acabo de escribir a Claude'), h('button', { class: 'btn secundario', onclick: () => empiezaEspera('ingles') }, 'Esperar a Claude con inglés'))));
   const paso = N.siguientePaso(P.d, D, { foco: !!foco, espera: !!espera }, I);
   const siguiente = espera ? null : h('section', { class: 'tarjeta siguiente', 'aria-labelledby': 'sig-t' },
     h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, 'Siguiente paso'), h('span', { class: 'insignia ai' }, `Tema ${D.temas.indexOf(t) + 1}: ${t.titulo}`)),
@@ -335,7 +383,7 @@ PINTA.hoy = function () {
   const focoT = foco ? null : h('section', { class: 'tarjeta' },
     h('div', { class: 'entre' }, h('h2', null, `Bloque de foco · ${P.d.ajustes.foco} min`), h('span', { class: 'insignia kihada' }, 'Una vez al día')),
     h('p', { class: 'tenue' }, 'Las esperas sirven para repasar; lo nuevo se aprende escribiendo código con calma. Antes de empezar, dale a Claude una tarea grande y entera, para que trabaje solo todo el bloque.'),
-    h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: empiezaFoco }, 'Empezar el bloque'), h('button', { class: 'btn plano', onclick: () => ir('plan') }, 'Por qué funciona')));
+    h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => empiezaFoco() }, 'Empezar el bloque'), h('button', { class: 'btn plano', onclick: () => ir('plan') }, 'Por qué funciona')));
   const sem = N.semana(P.d), tope = Math.max(meta, ...sem.map(v => v.retos)), letras = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
   const barras = h('div', { class: 'semana', role: 'img', 'aria-label': 'Retos de los últimos 7 días: ' + sem.map(v => v.retos).join(', ') },
     ...sem.map((v, j) => h('div', { class: 'dia' + (j === 6 ? ' hoy' : ''), title: `${v.retos} retos` }, h('span', { class: v.retos >= meta ? 'lleno' : '', style: `height:${Math.max(3, v.retos / tope * 100)}%` }), letras[new Date(v.k + 'T12:00').getDay()])));

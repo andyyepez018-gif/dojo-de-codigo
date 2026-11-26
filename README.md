@@ -10,6 +10,9 @@ instala en el móvil y en el PC, funciona sin internet y se actualiza sola.
 
 ## Qué hace
 
+- **¿Cuánto tiempo tienes?** La portada ofrece una sesión de 5 minutos (retos y repasos), de 20 (retos,
+  inglés y habla, con una barra que cuenta cada parte) o una hora (bloque de foco con la lección o el
+  proyecto). Y aparte, el modo para las esperas de Claude.
 - **Retos** de cinco clases (qué muestra, completar el hueco, ordenar líneas, encontrar el error y
   traducir entre lenguajes), generados con números nuevos cada vez. El motor calcula la respuesta real,
   así que nunca hay una respuesta mal puesta.

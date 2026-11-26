@@ -46,7 +46,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.screenshot({ path: path.join(CAPTURAS, '02-hoy.png'), fullPage: true });
 
   console.log('2. Retos (todas las clases), espera y paso a paso desde un reto');
-  await p.getByRole('button', { name: 'Sí · empezar retos' }).click(); await p.waitForSelector('.reto');
+  await p.getByRole('button', { name: 'Le acabo de escribir a Claude' }).click(); await p.waitForSelector('.reto');
   ok('la banda de espera aparece', await p.locator('.banda.espera').isVisible());
   const vistos = new Set();
   for (let i = 0; i < 16; i++) {
@@ -438,6 +438,25 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
     await cierraFiesta(p); await p.click('#siguiente'); await p.waitForSelector('.reto');
   }
   ok('«¿Qué pieza es?»: la categoría marcada es la buena (el robot lee el color y acierta)', piezasVistas >= 1 && piezasBien === piezasVistas, [piezasBien, piezasVistas]);
+  await c.close();
+
+  console.log('17. ¿Cuánto tiempo tienes? Sesiones de 5 y 20 minutos y una hora');
+  ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 50 }));
+  await p.goto(URL + '#hoy'); await p.waitForSelector('.tiempos');
+  ok('la portada pregunta cuánto tiempo tienes, con tres opciones y la espera de Claude aparte', /¿Cuánto tiempo tienes\?/.test(await p.textContent('.portada')) && await p.locator('.tiempos .btn').count() === 3 && await p.getByRole('button', { name: 'Le acabo de escribir a Claude' }).count() === 1);
+  await p.screenshot({ path: path.join(CAPTURAS, '29-cuanto-tiempo.png') });
+  await p.locator('.tiempos .btn', { hasText: '20 minutos' }).click(); await p.waitForSelector('.banda.sesion');
+  ok('20 minutos: barra con reloj y las tres partes', /Sesión de 20 minutos/.test(await p.textContent('.banda.sesion')) && /Retos 0\/8/.test(await p.textContent('.banda.sesion')) && /Habla 0\/5/.test(await p.textContent('.banda.sesion')));
+  for (let k = 0; k < 3; k++) { await responderReto(p); await p.waitForSelector('.respuesta'); await cierraFiesta(p); await p.click('#siguiente'); await p.waitForSelector('.reto'); }
+  await pausa(1100);
+  ok('la sesión cuenta lo que haces', /Retos 3\/8/.test(await p.textContent('.banda.sesion')), await p.textContent('.banda.sesion'));
+  await p.locator('.banda.sesion').getByRole('button', { name: /^Inglés/ }).click(); await p.waitForSelector('#v-ingles .ejercicio');
+  ok('desde la barra se salta a inglés', await p.locator('#v-ingles .ejercicio').count() === 1);
+  await p.locator('.banda.sesion').getByRole('button', { name: 'Terminar' }).click();
+  ok('al terminar, un resumen', /3 retos/.test(await p.textContent('#aviso')));
+  await p.goto(URL + '#hoy'); await p.locator('.tiempos .btn', { hasText: '1 hora' }).click(); await p.waitForSelector('.banda.foco');
+  await pausa(400);
+  ok('una hora: bloque de foco de 60 minutos con la lección abierta', /^(60|59):/.test(await p.textContent('#reloj-foco')) && await p.locator('#v-ruta').isVisible(), [await p.textContent('#reloj-foco'), await p.evaluate(() => location.hash)]);
   await c.close();
 
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');

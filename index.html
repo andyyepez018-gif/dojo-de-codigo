@@ -143,6 +143,12 @@ select.campo, input.campo, textarea.campo { border: 1px solid var(--linea); back
 .metrica b { font: 700 24px/1 var(--f-titulo); font-variant-numeric: tabular-nums; }
 .metrica small { color: var(--tinta-2); font-size: 12.5px; }
 @media (max-width: 640px) { .metricas { grid-template-columns: 1fr 1fr; } }
+.tiempos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.portada .btn.tiempo { background: var(--sobre-ai); color: var(--ai-fuerte); border-color: var(--sobre-ai); border-radius: 14px; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; text-align: left; min-width: 0; }
+.portada .btn.tiempo b { font: 800 18px/1.1 var(--f-titulo); }
+.portada .btn.tiempo small { font-size: 12.5px; font-weight: 500; color: var(--tinta-2); }
+@media (max-width: 420px) { .portada .btn.tiempo { padding: 10px; } .portada .btn.tiempo b { font-size: 16px; } }
+.banda.sesion { background: var(--bien); color: var(--sobre-ai); }
 .portada .btn.secundario { background: transparent; color: var(--sobre-ai); border-color: rgba(255, 255, 255, .6); }
 .portada .btn.secundario:hover { border-color: var(--sobre-ai); }
 /* Rango */
