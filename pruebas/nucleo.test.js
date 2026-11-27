@@ -133,7 +133,7 @@ ok('llenar la última parte NO sube: abre el examen', rr.cambio && rr.cambio.tip
 ok('equivocarse resta 5 y corta la racha', N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: false }).puntos === -5 && ga.combo === 0 && ga.puntos === 295);
 rr = N.registraReto(ga, D, { tema: 'salida', tpl: 'comas', lang: 'py', ok: true });
 ok('con la parte llena, un acierto solo recupera hasta el tope', rr.puntos === 5 && rr.tope === 'codigo' && ga.puntos === 300, rr);
-ok('el examen del rango 2 está disponible', N.estadoExamen(ga).disponible && N.estadoExamen(ga).preguntas === 12 && N.estadoExamen(ga).nota === 0.7 && N.estadoExamen(ga).sabe.length === 3);
+ok('el examen del rango 2 está disponible', N.estadoExamen(ga).disponible && N.estadoExamen(ga).preguntas === 12 && N.estadoExamen(ga).nota === 1 && N.estadoExamen(ga).sabe.length === 3);
 const fallosEj = [{ area: 'codigo', spec: { tpl: 'comas', lang: 'py', tipo: 'salida', seed: 7 } }, { area: 'habla', spec: { bloque: 'b1', tipo: 'definicion', seed: 9 } }];
 let rx = N.registraExamen(ga, 1, { bien: 7, total: 12, fallos: fallosEj });
 ok('suspender resta puntos (−50 en el rango 2, repartidos entre las partes) y no sube', !rx.aprobado && rx.puntos === -50 && ga.puntos === 250 && ga.rangoMax === 0 && ga.tramo.codigo < 120 && ga.tramo.ingles < 105 && ga.tramo.habla < 75, rx);
@@ -150,8 +150,11 @@ const areasExamen = (cod, ing, hab) => [...Array(cod[1]).keys()].map(i => ({ are
 const gx = JSON.parse(JSON.stringify(ga));
 rx = N.registraExamen(gx, 1, { bien: 10, total: 12, areas: areasExamen([3, 5], [4, 4], [3, 3]) });
 ok('aprobar por partes: 83 % en total pero solo 3 de 5 en código → suspendido', !rx.aprobado && JSON.stringify(rx.flojas) === '["codigo"]' && rx.porArea.codigo.bien === 3 && rx.porArea.codigo.total === 5, rx);
-rx = N.registraExamen(ga, 1, { bien: 10, total: 12, areas: areasExamen([4, 5], [3, 4], [3, 3]) });
-ok('aprobar (83 %, y cada parte en el 70 % o más) sube de rango y da +150', rx.aprobado && rx.cambio.tipo === 'sube' && ga.rangoMax === 1 && N.rangoActual(ga).i === 1 && rx.puntos === 150 && !rx.flojas.length, rx);
+rx = N.registraExamen(JSON.parse(JSON.stringify(ga)), 1, { bien: 11, total: 12, areas: areasExamen([5, 5], [3, 4], [3, 3]) });
+ok('el examen pide el 100 %: con 11 de 12 se suspende', !rx.aprobado && rx.puntos === -50, rx);
+ok('todos los exámenes piden el 100 %', N.RANGOS.slice(1).every(R => R.examen.nota === 1));
+rx = N.registraExamen(ga, 1, { bien: 12, total: 12, areas: areasExamen([5, 5], [4, 4], [3, 3]) });
+ok('aprobar (12 de 12) sube de rango y da +150', rx.aprobado && rx.cambio.tipo === 'sube' && ga.rangoMax === 1 && N.rangoActual(ga).i === 1 && rx.puntos === 150 && !rx.flojas.length, rx);
 ok('el premio empieza el tramo siguiente, repartido entre las tres partes', ga.tramo.k === 2 && ga.tramo.codigo === 60 && ga.tramo.ingles === 53 && ga.tramo.habla === 37 && ga.puntos === 450, ga.tramo);
 ok('el historial guarda los dos intentos', ga.examenes.historial.length === 2 && ga.examenes.historial[1].aprobado);
 ok('la multa crece con el rango (10 % del mínimo, al menos 50)', N.multaExamen(1) === 50 && N.multaExamen(2) === 100 && N.multaExamen(9) === 3000);
@@ -205,6 +208,7 @@ ok('normaliza escritos y proyectos', (() => { const z = N.normaliza({ escritos: 
 ok('el código de progreso lleva la habla y los exámenes', JSON.stringify(N.leeCodigoProgreso(N.codigoProgreso(hj), D, I, J).jerga) === JSON.stringify(hj.jerga));
 const g3 = N.normaliza({ v: 2, puntos: 3 }, D, I);
 ok('los puntos nunca bajan de 0', N.sumaPuntos(g3, -50).delta === -3 && g3.puntos === 0);
+ok('un día guardado sin puntos (de antes de los puntos) queda en 0, no en −1.000.000.000', N.normaliza({ v: 2, dias: { '2026-11-24': { retos: 3 } } }, D, I, J).dias['2026-11-24'].puntos === 0 && N.normaliza({ v: 2, dias: { '2026-11-24': { retos: 3, puntos: -1e9 } } }, D, I, J).dias['2026-11-24'].puntos === -1e9);
 ok('el día guarda los puntos netos', N.leeDia(g3).puntos === -3, N.leeDia(g3));
 const g4 = N.normaliza({ v: 2, puntos: 22000, rangoMax: 8, examenes: {}, ajustes: { meta: 10 } }, D, I); let tot = 0;
 for (let k = 0; k < 10; k++) tot += N.registraReto(g4, D, { tema: 'salida', tpl: 'comas', lang: 'ps', ok: true }).puntos;

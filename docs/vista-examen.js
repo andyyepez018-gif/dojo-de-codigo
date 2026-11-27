@@ -215,7 +215,7 @@ raiz.VistaExamen = function (ctx) {
       h('section', { class: 'tarjeta resultado-examen ' + (r.aprobado ? 'aprobado' : 'suspendido'), role: 'status' },
         h('span', { class: 'etiqueta' }, `Examen para «${R.n}»`),
         h('h1', null, r.aprobado ? `Aprobado: ya eres ${R.n}` : 'Suspendido'),
-        h('p', { class: 'nota-examen num' }, `${nota} %`, h('small', null, ` · ${r.bien} de ${r.total} bien · hacía falta el ${minimo} %`)),
+        h('p', { class: 'nota-examen num' }, `${nota} %`, h('small', null, ` · ${r.bien} de ${r.total} bien · ${minimo === 100 ? 'hacía falta acertarlas todas' : `hacía falta el ${minimo} %`}`)),
         h('ul', { class: 'requisitos', id: 'ex-partes' }, ...[['codigo', cod], ['ingles', ing], ['habla', hab]].filter(([, qs]) => qs.length).map(([a, qs]) => {
           const b = qs.filter(q => q.ok).length, okA = b / qs.length >= R.examen.nota;
           return h('li', { class: okA ? 'si' : 'no' }, h('span', { class: 'pila' }, h('b', null, `${okA ? '✓' : '✗'} ${N.NOMBRE_AREA[a]}: ${b} de ${qs.length} (${Math.round(b / qs.length * 100)} %)`)));
@@ -264,7 +264,7 @@ raiz.VistaExamen = function (ctx) {
         h('ul', { class: 'lista' },
           h('li', null, h('b', null, `${ex.preguntas} preguntas`), ` mezcladas: código (leer y escribir, en PSeInt, Python y C++), inglés y habla de programador.`),
           h('li', null, h('b', null, 'Escribir de verdad: '), `${ex.rango <= 2 ? 'un programa' : 'dos programas'} desde cero y alguna línea que falta, sin autocompletar ni pistas: como si fuera en papel o en el bloc de notas.`),
-          h('li', null, h('b', null, `Para aprobar: el ${Math.round(ex.nota * 100)} % en cada parte`), ` (código, inglés y habla por separado; ${Math.ceil(ex.preguntas * ex.nota)} bien como mínimo en total). Una parte floja no se compensa con otra.`),
+          h('li', null, h('b', null, `Para aprobar: perfecto, ${ex.preguntas} de ${ex.preguntas}`), '. Un solo fallo y se suspende: así no se sube de rango arrastrando errores.'),
           h('li', null, h('b', null, 'Sin ninguna ayuda: '), 'ni tutor, ni pistas, ni pronunciación escrita, ni paso a paso. No sabrás si aciertas hasta el final.'),
           h('li', null, h('b', null, 'Sin salir: '), 'si cambias de pantalla o cierras la app, cuenta como suspendido.'),
           h('li', null, h('b', null, `Si suspendes, pierdes ${U.miles(ex.multa)} puntos`), ', repasas lo que fallaste y, cuando recuperes los puntos, lo repites. Aprobar da +' + N.PUNTOS.examen + ' puntos.')),

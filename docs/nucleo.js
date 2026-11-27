@@ -2,7 +2,7 @@
    No toca el DOM, así que se prueba igual en Node que en el navegador. */
 (function (raiz) {
 'use strict';
-const VERSION = '1.11.0';
+const VERSION = '1.12.0';
 const LANGS = ['ps', 'py', 'cpp'];
 const REGLA = 'Si le mando un mensaje a Claude, entonces abro el Dojo y hago retos hasta que me responda.';
 const INTERVALOS = [0, 1, 3, 7, 16, 35];   // días hasta el siguiente repaso según la caja (0 = fallado)
@@ -16,23 +16,23 @@ const INTERVALOS = [0, 1, 3, 7, 16, 35];   // días hasta el siguiente repaso se
 const RANGOS = [
   { n: 'Aprendiz', min: 0, lema: 'Empiezas a leer código y a adivinar qué hace.',
     sabe: ['Leer un programa muy corto y decir qué muestra.', 'Saludar en inglés.', 'Saber que existen las variables y las funciones.'] },
-  { n: 'Estudiante de código', min: 300, lema: 'Ya sabes qué es una variable, un if y un bucle.', examen: { temas: 2, unidades: 1, bloques: 1, preguntas: 12, nota: 0.7 },
+  { n: 'Estudiante de código', min: 300, lema: 'Ya sabes qué es una variable, un if y un bucle.', examen: { temas: 2, unidades: 1, bloques: 1, preguntas: 12, nota: 1 },
     sabe: ['Mostrar texto y números y guardar datos en variables, en PSeInt, Python y C++.', 'Presentarte en inglés: quién eres, a qué te dedicas y qué aprendes.', 'Usar bien los términos básicos (variable, función, bucle, condición, algoritmo) y explicar tu código sin rodeos.'] },
-  { n: 'Pasante', min: 1000, lema: 'Escribes programas pequeños con ayuda.', examen: { temas: 3, unidades: 2, bloques: 1, preguntas: 14, nota: 0.7 },
+  { n: 'Pasante', min: 1000, lema: 'Escribes programas pequeños con ayuda.', examen: { temas: 3, unidades: 2, bloques: 1, preguntas: 14, nota: 1 },
     sabe: ['Calcular: suma, resta, multiplicación, división, división entera, resto y paréntesis.', 'Leer en voz alta números, símbolos y código en inglés.', 'Pedir que te expliquen algo y decir «no lo sé; lo investigo».'] },
-  { n: 'Programador junior', min: 2200, lema: 'Resuelves ejercicios tú solo, aunque tardes.', examen: { temas: 4, unidades: 3, bloques: 2, preguntas: 16, nota: 0.7 },
+  { n: 'Programador junior', min: 2200, lema: 'Resuelves ejercicios tú solo, aunque tardes.', examen: { temas: 4, unidades: 3, bloques: 2, preguntas: 16, nota: 1 },
     sabe: ['Pedir datos al usuario y trabajar con ellos.', 'Seguir instrucciones en inglés: abrir, guardar, ejecutar, la pantalla y el teclado.', 'Hablar de errores con propiedad (excepción, depurar, causa raíz, caso límite) y reportar un fallo con pasos.'] },
-  { n: 'Programador', min: 4000, lema: 'Lees y escribes los tres lenguajes sin miedo.', examen: { temas: 5, unidades: 4, bloques: 2, preguntas: 18, nota: 0.75 },
+  { n: 'Programador', min: 4000, lema: 'Lees y escribes los tres lenguajes sin miedo.', examen: { temas: 5, unidades: 4, bloques: 2, preguntas: 18, nota: 1 },
     sabe: ['Tomar decisiones con si/if, sino/else y condiciones compuestas.', 'Entender las palabras del código en inglés: if, while, return, true, false…', 'Pedir ayuda explicando qué probaste y reconocer cuando rompiste algo.'] },
-  { n: 'Programador senior', min: 6500, lema: 'Encuentras los errores rápido y sabes explicar por qué.', examen: { temas: 6, unidades: 6, bloques: 3, preguntas: 20, nota: 0.75 },
+  { n: 'Programador senior', min: 6500, lema: 'Encuentras los errores rápido y sabes explicar por qué.', examen: { temas: 6, unidades: 6, bloques: 3, preguntas: 20, nota: 1 },
     sabe: ['Repetir con bucles «mientras»: contadores, acumuladores y cuándo terminan.', 'Decir en inglés lo que necesitas hacer y explicar qué hace un código.', 'Trabajar como en un equipo: repositorio, commit, rama, fusionar, solicitud de cambios y revisión de código.'] },
-  { n: 'Ingeniero de software', min: 10000, lema: 'Piensas antes de escribir: datos, pasos y pruebas.', examen: { temas: 7, unidades: 7, bloques: 3, preguntas: 22, nota: 0.75 },
+  { n: 'Ingeniero de software', min: 10000, lema: 'Piensas antes de escribir: datos, pasos y pruebas.', examen: { temas: 7, unidades: 7, bloques: 3, preguntas: 22, nota: 1 },
     sabe: ['Repetir contando con «para/for»: rangos, pasos y bucles anidados.', 'Leer y entender mensajes de error reales en inglés.', 'Dar y recibir críticas en una revisión de código de forma profesional.'] },
-  { n: 'Ingeniero senior', min: 15000, lema: 'Meses de constancia: practicas casi todos los días.', examen: { temas: 8, unidades: 9, bloques: 4, preguntas: 25, nota: 0.8 },
+  { n: 'Ingeniero senior', min: 15000, lema: 'Meses de constancia: practicas casi todos los días.', examen: { temas: 8, unidades: 9, bloques: 4, preguntas: 25, nota: 1 },
     sabe: ['Usar arreglos y listas: recorrerlos, buscar, sumar, el mayor y el menor.', 'Pedir ayuda y contar lo que hiciste en inglés (pasado y commits).', 'Hablar de calidad: pruebas unitarias, refactorizar, deuda técnica, legibilidad y rendimiento.'] },
-  { n: 'Arquitecto de software', min: 22000, lema: 'Dominas la base y podrías enseñársela a otros.', examen: { temas: 9, unidades: 10, bloques: 5, preguntas: 28, nota: 0.8 },
+  { n: 'Arquitecto de software', min: 22000, lema: 'Dominas la base y podrías enseñársela a otros.', examen: { temas: 9, unidades: 10, bloques: 5, preguntas: 28, nota: 1 },
     sabe: ['Diseñar funciones con parámetros y valor de retorno.', 'Hablar de planes en inglés (will y going to).', 'Estimar, negociar plazos y avisar de bloqueos como un profesional.'] },
-  { n: 'Ingeniero de élite', min: 30000, lema: 'La cima del Dojo. Pocos llegan hasta aquí.', examen: { temas: 10, unidades: 14, bloques: 8, preguntas: 36, nota: 0.85 },
+  { n: 'Ingeniero de élite', min: 30000, lema: 'La cima del Dojo. Pocos llegan hasta aquí.', examen: { temas: 10, unidades: 14, bloques: 8, preguntas: 36, nota: 1 },
     sabe: ['Trabajar con texto (recorrer, contar, cortar y transformar cadenas) y todo lo anterior junto, sin ayuda.', 'Participar en una reunión y una revisión de código en inglés, leer documentación y pasar una entrevista técnica.', 'Hablar de producción y de diseño (desplegar, revertir, incidentes, cuellos de botella, compromisos) y defenderte en una entrevista, en español y en inglés.'] }
 ];
 /* Cuánto vale cada cosa. La racha de aciertos (combo) suma +1 por acierto seguido, hasta +5. */
@@ -90,6 +90,7 @@ function estadoAreas(d) {
   return out;
 }
 /* Suspender un examen resta el 10 % de los puntos de ese rango (al menos 50): hay que volver a ganarlos */
+/* Aprobar un examen pide el 100 %: ni un fallo (orden de Andy: los fallos que se dejan pasar se acumulan rango a rango) */
 const multaExamen = k => Math.max(50, Math.round(RANGOS[k].min * 0.1));
 
 const hoyClave = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -132,12 +133,13 @@ function normaliza(d, D, I, J) {
       ((x.area === 'codigo' && D.porId[x.spec.tpl] && LANGS.includes(x.spec.lang)) || (x.area === 'escribe' && /^[a-z0-9-]{1,40}$/.test(x.spec.tarea) && LANGS.includes(x.spec.lang)) || (x.area === 'ingles' && (!I || I.porId[x.spec.unidad])) || (x.area === 'habla' && (!J || J.porId[x.spec.bloque]))))
       .slice(0, 40).map(x => ({ area: x.area, spec: JSON.parse(JSON.stringify(x.spec)) }));
   }
+  // los días de antes de los puntos no los tienen: cuentan 0 (no el mínimo permitido)
   if (d.dias && typeof d.dias === 'object') for (const k of Object.keys(d.dias)) {
     if (!esFecha(k)) continue; const x = d.dias[k] || {};
     const retos = entero(x.retos), ingles = entero(x.ingles);
     const jerga = entero(x.jerga);
     n.dias[k] = { retos, aciertos: entero(x.aciertos, 0, retos), foco: entero(x.foco, 0, 1440), esperas: entero(x.esperas), perdidas: entero(x.perdidas), segEspera: entero(x.segEspera),
-      puntos: entero(x.puntos, -1e9), ingles, inglesOk: entero(x.inglesOk, 0, ingles), jerga, jergaOk: entero(x.jergaOk, 0, jerga) };
+      puntos: Number.isFinite(Number(x.puntos)) ? entero(x.puntos, -1e9) : 0, ingles, inglesOk: entero(x.inglesOk, 0, ingles), jerga, jergaOk: entero(x.jergaOk, 0, jerga) };
   }
   for (const t of D.temas) {
     const x = d.temas && d.temas[t.id]; if (!x || typeof x !== 'object') continue;
@@ -508,7 +510,7 @@ function siguientePaso(d, D, estado = {}, I = null) {
     const f = ex.faltan[0];
     return { id: 'requisito', titulo: `Para el examen te falta dominar «${f.titulo}»`, texto: `${NOMBRE_AREA[f.area]}: ${f.falta}. Ya tienes los puntos y el proyecto; el examen se abre cuando domines todo lo que entra${ex.faltan.length > 1 ? ` (te quedan ${ex.faltan.length} cosas)` : ''}.`, accion: 'requisito', req: f, boton: 'Practicarlo' };
   }
-  if (ex && ex.disponible && !estado.foco) return { id: 'examen', titulo: `Examen para «${ex.nombre}»`, texto: `Ya tienes los puntos y dominas lo que entra. Para subir de rango, aprueba el examen: ${ex.preguntas} preguntas sin ayuda de código, inglés y habla; necesitas el ${Math.round(ex.nota * 100)} % en cada parte.`, accion: 'examen', boton: 'Ver el examen' };
+  if (ex && ex.disponible && !estado.foco) return { id: 'examen', titulo: `Examen para «${ex.nombre}»`, texto: `Ya tienes los puntos y dominas lo que entra. Para subir de rango, aprueba el examen: ${ex.preguntas} preguntas sin ayuda de código, inglés y habla; hay que acertarlas todas.`, accion: 'examen', boton: 'Ver el examen' };
   if (estado.foco) return { id: 'foco', titulo: 'Estás en tu bloque de foco', texto: `Lee la lección de «${t.titulo}» y resuelve su ejercicio sin mirar a Claude.`, accion: 'tema', boton: 'Abrir la lección' };
   if (dominados(d, D) >= D.temas.length) return { id: 'fin', titulo: 'Dominaste los diez temas', texto: 'Ya tienes la base de los tres lenguajes. Ahora toca un proyecto tuyo en el laboratorio, y repasar para no olvidar.', accion: 'lab', boton: 'Ir al laboratorio' };
   if (e.retos && !e.ej) return { id: 'ejercicio', titulo: `Te falta el ejercicio de «${t.titulo}»`, texto: 'Ya dominas sus retos. Escribe el ejercicio en el laboratorio para ganar el siguiente cinturón.', accion: 'ejercicio', boton: 'Resolver el ejercicio' };

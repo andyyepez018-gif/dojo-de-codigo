@@ -102,7 +102,7 @@ function trataPuntos(res, ok) {
   const c = res && res.cambio; if (!c) return;
   const R = N.RANGOS[c.i], sig = N.RANGOS[c.i + 1];
   if (c.tipo === 'sube') U.celebra(c.i, `Examen aprobado. ${R.lema} ${sig ? `El examen de «${sig.n}» se abre con ${U.miles(sig.min)} puntos.` : 'Llegaste al rango más alto del Dojo.'}`, { figura: U.emblema(c.i, 92, R.n), etiqueta: `Nuevo rango · ${c.i + 1} de ${N.RANGOS.length}`, titulo: R.n });
-  else if (c.tipo === 'examen') U.celebra(c.i, `Ya puedes hacer el examen de «${R.n}»: tienes los puntos de las tres partes y dominas lo que entra. Para subir, aprueba su examen: ${R.examen.preguntas} preguntas de código e inglés, sin ninguna ayuda. Necesitas el ${Math.round(R.examen.nota * 100)} %.`, { figura: U.emblema(c.i, 92, R.n), etiqueta: 'Examen de ascenso disponible', titulo: R.n, accion: { texto: 'Ver el examen', fn: () => ir('examen') } });
+  else if (c.tipo === 'examen') U.celebra(c.i, `Ya puedes hacer el examen de «${R.n}»: tienes los puntos de las tres partes y dominas lo que entra. Para subir, aprueba su examen: ${R.examen.preguntas} preguntas de código, inglés y habla, sin ninguna ayuda. Hay que acertarlas todas.`, { figura: U.emblema(c.i, 92, R.n), etiqueta: 'Examen de ascenso disponible', titulo: R.n, accion: { texto: 'Ver el examen', fn: () => ir('examen') } });
   else if (c.tipo === 'recupera') aviso(`Recuperaste el rango «${R.n}».`, 4000);
   else if (c.tipo === 'baja') aviso(`Bajaste a «${R.n}». Con ${U.miles(sig.min - P.d.puntos)} puntos más recuperas «${sig.n}».`, 5500);
 }
@@ -139,13 +139,13 @@ function tablaPuntos() {
       fila('Ejercicio del laboratorio que no pasa al comprobar', `−${-X.ejercicioFallo}`, 'menos'), fila('Respuesta no entendida en una conversación', `−${-X.conversaFallo}`, 'menos'),
       fila('Fallo en el repaso del examen', `−${-X.repasoFallo}`, 'menos'), fila('Examen suspendido', '−10 % de los puntos del rango', 'menos')),
       h('p', { class: 'tenue', style: 'font-size:13px' }, `Los puntos de cada rango vienen de tres partes: código (el ${Math.round(N.REPARTO.codigo * 100)} %, con el proyecto), inglés (el ${Math.round(N.REPARTO.ingles * 100)} %) y habla de programador (el ${Math.round(N.REPARTO.habla * 100)} %). Cada parte da su porción y ahí se para: con una sola no se llega. Para el examen, además, hay que dominar lo que entra y terminar el proyecto.`),
-      h('p', { class: 'tenue', style: 'font-size:13px' }, `Subir de rango pide aprobar su examen (código, inglés y habla de programador), sin ayuda y con la nota mínima en cada parte. Suspender resta el 10 % de los puntos de ese rango y te deja un repaso obligatorio de lo que fallaste; cuando lo termines y vuelvas a tus puntos, lo repites. La racha: cada acierto seguido suma +1 más, hasta +${X.comboMax}; un fallo la corta. Los puntos nunca bajan de 0. Si bajan del mínimo de tu rango, bajas, y lo recuperas al volver a subir (sin repetir el examen). Equivocarse resta en todo: retos, inglés, habla, ejercicios del laboratorio y conversaciones.`)));
+      h('p', { class: 'tenue', style: 'font-size:13px' }, `Subir de rango pide aprobar su examen (código, inglés y habla de programador), sin ayuda y sin un solo fallo. Suspender resta el 10 % de los puntos de ese rango y te deja un repaso obligatorio de lo que fallaste; cuando lo termines y vuelvas a tus puntos, lo repites. La racha: cada acierto seguido suma +1 más, hasta +${X.comboMax}; un fallo la corta. Los puntos nunca bajan de 0. Si bajan del mínimo de tu rango, bajas, y lo recuperas al volver a subir (sin repetir el examen). Equivocarse resta en todo: retos, inglés, habla, ejercicios del laboratorio y conversaciones.`)));
 }
 function escaleraRangos() {
   const rg = N.rangoActual(P.d);
   return h('ol', { class: 'escalera' }, ...N.RANGOS.map((R, k) => h('li', { class: k === rg.i ? 'actual' : k <= P.d.rangoMax ? 'logrado' : 'futuro', 'aria-current': k === rg.i ? 'step' : null },
     U.emblema(k, 30, R.n), h('span', { class: 'detalle' }, h('b', null, R.n), h('small', { class: 'tenue' }, R.lema),
-      R.examen ? h('small', { class: 'requisito' }, `${U.miles(R.min)} puntos + examen: ${R.examen.preguntas} preguntas (temas 1–${R.examen.temas}, inglés 1–${R.examen.unidades}, habla 1–${R.examen.bloques}), ${Math.round(R.examen.nota * 100)} % para aprobar${k <= P.d.rangoMax ? ' · aprobado' : ''}`) : null,
+      R.examen ? h('small', { class: 'requisito' }, `${U.miles(R.min)} puntos + examen: ${R.examen.preguntas} preguntas (temas 1–${R.examen.temas}, inglés 1–${R.examen.unidades}, habla 1–${R.examen.bloques}), todas bien para aprobar${k <= P.d.rangoMax ? ' · aprobado' : ''}`) : null,
       h('small', { class: 'sabe-rango' }, 'Sabe: ' + R.sabe.join(' · '))),
     h('span', { class: 'num tenue' }, k === rg.i ? 'Tú' : U.miles(R.min)))));
 }
