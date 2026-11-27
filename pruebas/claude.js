@@ -28,8 +28,13 @@ const srv = http.createServer((q, r) => {
   ok('el pie dice que se guarda en la cuenta', /en tu cuenta/.test(await p.textContent('#pie-lateral')));
   ok('sin service worker dentro de Claude', await p.evaluate(async () => !(await navigator.serviceWorker.getRegistration())));
   await p.goto('http://localhost:8771/#retos'); await p.waitForSelector('.reto');
-  await p.locator('.opcion, .codigo li.toca').first().click().catch(async () => { while (await p.locator('.piezas .pieza').count()) await p.locator('.piezas .pieza').first().click(); await p.getByRole('button', { name: 'Comprobar' }).click(); });
-  await p.waitForSelector('.respuesta');
+  // Los retos salen al azar: «¿Qué pieza es?» no lleva tutor (su explicación es la lección de colores), así que se pasa al siguiente
+  for (let i = 0; i < 15; i++) {
+    await p.locator('.opcion, .codigo li.toca').first().click().catch(async () => { while (await p.locator('.piezas .pieza').count()) await p.locator('.piezas .pieza').first().click(); await p.getByRole('button', { name: 'Comprobar' }).click(); });
+    await p.waitForSelector('.respuesta');
+    if (await p.getByRole('button', { name: 'Explícamelo mejor' }).count()) break;
+    await p.locator('#siguiente').click(); await p.waitForSelector('.reto');
+  }
   ok('el tutor aparece con «Usa tu cuenta de Claude»', await p.getByRole('button', { name: 'Explícamelo mejor' }).isVisible());
   await p.getByRole('button', { name: 'Explícamelo mejor' }).click(); await p.waitForTimeout(300);
   ok('el tutor responde', /Explicación de prueba/.test(await p.textContent('.tutor')));
