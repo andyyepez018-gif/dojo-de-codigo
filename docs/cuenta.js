@@ -8,7 +8,7 @@
 'use strict';
 // Los dos datos públicos del proyecto (Supabase → Project Settings → API). La clave «anon» está hecha
 // para ir en la página: la seguridad la ponen las reglas de la base de datos (cada uno ve solo lo suyo).
-const CONFIG = { url: '', anon: '' };
+const CONFIG = { url: '', anon: '' };   // anon: la clave «publishable» (sb_publishable_…) o la clásica «anon» (eyJ…)
 
 const CLAVE_SESION = 'dojo-sesion';
 const lee = k => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
@@ -37,8 +37,10 @@ const MENSAJES = {
 };
 async function pide(ruta, { metodo = 'GET', cuerpo, token, prefer } = {}) {
   const c = config(); if (!activa()) throw new ErrorCuenta('Las cuentas no están configuradas.', 'sin_config');
+  // La clave pública va en «apikey»; «Authorization» solo lleva la sesión del aprendiz (así sirven tanto la clave
+  // nueva «publishable» como la clásica «anon»)
   const cab = { apikey: c.anon, 'Content-Type': 'application/json' };
-  cab.Authorization = 'Bearer ' + (token || c.anon); if (prefer) cab.Prefer = prefer;
+  if (token) cab.Authorization = 'Bearer ' + token; if (prefer) cab.Prefer = prefer;
   let r;
   try { r = await fetch(c.url + ruta, { method: metodo, headers: cab, body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo) }); }
   catch (e) { throw new ErrorCuenta('Sin conexión: revisa tu internet y vuelve a intentarlo.', 'red'); }

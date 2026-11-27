@@ -25,6 +25,7 @@ let bien = 0, mal = 0; const ok = (n, c, d) => { if (c) bien++; else { mal++; co
   const r = await C.registra(Object.assign({}, bueno, { correo: ' ANA@correo.com ' }));
   const l0 = llamadas[0];
   ok('registrarse manda correo (en minúsculas), contraseña y nombre/ficha/aviso como datos del usuario', l0.url === 'https://prueba.supabase.co/auth/v1/signup' && l0.cuerpo.email === 'ana@correo.com' && l0.cuerpo.password === 'clave1234' && l0.cuerpo.data.nombre === 'Ana Pérez' && l0.cuerpo.data.ficha === '2834567' && l0.cuerpo.data.acepta_datos === true && l0.o.headers.apikey === 'a'.repeat(40));
+  ok('sin sesión, la clave pública va solo en «apikey» (sirve la clave publishable y la anon)', l0.o.headers.Authorization === undefined);
   ok('con sesión al registrarse, queda dentro', r.sesion && C.sesion().user.nombre === 'Ana Pérez' && !r.confirmar);
   ok('la contraseña no se guarda en el aparato', ![...almacen.values()].some(v => v.includes('clave1234')));
   respuesta = () => ({ status: 200, body: { id: 'u2', email: 'x@y.com' } });
