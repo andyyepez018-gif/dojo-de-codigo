@@ -119,6 +119,12 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   { const t = await p.locator('.traza .salida').last().textContent(); ok('PSeInt paso a paso: al final solo lo de después de borrar', /456/.test(t) && !/antes/.test(t), t); }
   await p.getByRole('button', { name: '← Volver al editor' }).click(); await p.waitForSelector('#editor-codigo');
 
+  // el cuadro crece con el código: la capa donde se escribe y la de colores nunca se separan
+  await p.fill('#editor-codigo', Array.from({ length: 30 }, (_, i) => 'Escribir "línea ' + (i + 1) + '"').join('\n'));
+  await p.locator('#editor-codigo').press('Control+End'); await pausa(150);
+  { const m = await p.evaluate(() => { const ta = document.querySelector('#editor-codigo'), pre = ta.parentElement.querySelector('.pintado'); return { ta: ta.scrollTop, pre: pre.scrollTop, cabe: ta.clientHeight >= ta.scrollHeight - 1, alto: Math.abs(ta.getBoundingClientRect().height - pre.getBoundingClientRect().height) < 2 }; });
+    ok('con 30 líneas el cuadro crece: el cursor y el texto de colores van juntos', m.ta === 0 && m.pre === 0 && m.cabe && m.alto, m); }
+
   console.log('4. Paso a paso');
   await p.locator('#v-lab .chip', { hasText: 'Python' }).click();
   await p.fill('#editor-codigo', 'def doble(x):\n    y = x * 2\n    return y\n\nn = int(input())\nm = doble(n)\nprint("Resultado:", m)\n');

@@ -414,7 +414,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 .editor .pintado, .editor textarea { font: var(--ed)/1.6 var(--f-codigo); letter-spacing: 0; tab-size: 4; padding: 12px 12px 12px 4px; margin: 0; border: 0; white-space: pre; }
 .editor .pintado { position: absolute; inset: 0; overflow: hidden; color: var(--pz-texto); pointer-events: none; }
 .editor .pintado .kw { color: var(--pz-kw); } .editor .pintado .str { color: var(--pz-str); } .editor .pintado .nu { color: var(--pz-num); } .editor .pintado .fn { color: var(--pz-fn); } .editor .pintado .com { color: var(--pz-com); font-style: italic; }
-.editor textarea { position: relative; z-index: 1; display: block; resize: vertical; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--pz-str); min-height: 280px; width: 100%; outline: none; overflow: auto; }
+.editor textarea { position: relative; z-index: 1; display: block; resize: none; overflow-y: hidden; background: transparent; color: transparent; -webkit-text-fill-color: transparent; caret-color: var(--pz-str); min-height: 280px; width: 100%; outline: none; overflow-x: auto; }
 .editor textarea::selection { background: rgba(143, 169, 242, .35); }
 .editor .banda-error { position: absolute; left: 0; right: 0; top: 12px; height: calc(var(--ed) * 1.6); background: rgba(242, 130, 111, .2); box-shadow: inset 3px 0 0 var(--pz-num); pointer-events: none; }
 .consola { background: var(--hundido); border-radius: var(--r); padding: 12px; font: 14px/1.55 var(--f-codigo); min-height: 90px; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }

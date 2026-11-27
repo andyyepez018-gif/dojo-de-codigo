@@ -115,11 +115,19 @@ function editor({ valor, lang, alCambiar, alEjecutar, etiqueta, id }) {
   const banda = h('div', { class: 'banda-error', hidden: true });
   const ta = h('textarea', { id: id || 'editor-codigo', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off', autocorrect: 'off', 'aria-label': etiqueta || ('Tu código en ' + (NL[lang] || lang)), wrap: 'off' });
   ta.value = valor; let marcada = 0;
+  /* El cuadro crece con el código y nunca se desplaza por dentro en vertical: así la capa donde se escribe
+     (transparente, con el cursor) y la de colores van siempre juntas. Si se desplazara, el cursor y el texto
+     se separaban en cuanto el programa no cabía. */
+  const ajusta = () => {
+    if (!ta.isConnected) return;
+    const borde = ta.offsetHeight - ta.clientHeight;
+    ta.style.height = 'auto'; ta.style.height = (ta.scrollHeight + borde) + 'px';
+  };
   const pinta = () => {
     const ls_ = ta.value.split('\n');
     pintado.innerHTML = ls_.map(l => resalta(l, lang)).join('\n') + '\n ';
     nums.innerHTML = ls_.map((_, i) => i + 1 === marcada ? `<span class="err">${i + 1}</span>` : String(i + 1)).join('\n');
-    sincroniza();
+    ajusta(); sincroniza();
   };
   const sincroniza = () => {
     pintado.scrollTop = ta.scrollTop; pintado.scrollLeft = ta.scrollLeft; nums.scrollTop = ta.scrollTop;
@@ -151,6 +159,9 @@ function editor({ valor, lang, alCambiar, alEjecutar, etiqueta, id }) {
   });
   const el = h('div', { class: 'editor' }, nums, h('div', { class: 'area' }, banda, pintado, ta));
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(sincroniza).observe(ta);
+  // al entrar en la página (el cuadro se crea antes de estar en ella) y si cambia la letra
+  if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(() => { ajusta(); sincroniza(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { ajusta(); sincroniza(); });
   pinta();
   return { el, ta, marca(l) { marcada = l || 0; pinta(); if (l) { const alto = parseFloat(getComputedStyle(ta).lineHeight) || 22; if ((l - 1) * alto < ta.scrollTop || (l - 1) * alto > ta.scrollTop + ta.clientHeight - alto) ta.scrollTop = Math.max(0, (l - 3) * alto); } }, pon(v) { ta.value = v; marcada = 0; pinta(); } };
 }
