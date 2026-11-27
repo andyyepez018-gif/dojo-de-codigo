@@ -435,6 +435,25 @@ const MATRIZ_EJ = [
     sol: 'Algoritmo Calificaciones\n    Definir notas Como Real\n    Definir i, j Como Entero\n    Dimension notas[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese la nota:"\n            Leer notas[i,j]\n            Si notas[i,j] >= 3.0 Entonces\n                Escribir notas[i,j], ": Aprobado"\n            SiNo\n                Escribir notas[i,j], ": Reprobado"\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' }
 ];
 ps.capitulos.find(c => c.id === 'arreglos').ejercicios = MATRIZ_EJ;
+/* Ejercicios extra del capítulo personalizado: los «ejemplos cotidianos» de la presentación (edades,
+   inventario y números), con condicionales anidados */
+const MATRIZ_EXTRA = [
+  { id: 'mat-edades', titulo: '5. Clasificar edades por rangos', condicional: true,
+    enunciado: 'Crea una matriz de 2 × 2 con cuatro edades. Para cada una muestra «niño» si es menor de 13, «adolescente» si tiene de 13 a 17 y «adulto» si tiene 18 o más.',
+    pista: 'Un Si dentro del SiNo de otro Si (anidado): Si edad < 13 Entonces … SiNo Si edad < 18 Entonces … SiNo … FinSi FinSi',
+    pruebas: [{ entradas: ['8', '15', '30', '13'], buscar: ['niño', 'adolescente', 'adulto', 'adolescente'] }, { entradas: ['17', '18', '5', '70'], buscar: ['adolescente', 'adulto', 'niño', 'adulto'] }],
+    sol: 'Algoritmo Edades\n    Definir edades, i, j Como Entero\n    Dimension edades[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese una edad:"\n            Leer edades[i,j]\n            Si edades[i,j] < 13 Entonces\n                Escribir edades[i,j], ": niño"\n            SiNo\n                Si edades[i,j] < 18 Entonces\n                    Escribir edades[i,j], ": adolescente"\n                SiNo\n                    Escribir edades[i,j], ": adulto"\n                FinSi\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' },
+  { id: 'mat-inventario', titulo: '6. Detectar cantidades bajas en un inventario', condicional: true,
+    enunciado: 'Una tienda tiene 2 estantes con 2 productos cada uno: guarda las 4 cantidades en una matriz de 2 × 2. Para cada producto muestra «bajo» si quedan menos de 5 unidades o «suficiente» si quedan 5 o más.',
+    pista: 'Si cantidades[i,j] < 5 Entonces … SiNo … FinSi',
+    pruebas: [{ entradas: ['3', '12', '5', '0'], buscar: ['bajo', 'suficiente', 'suficiente', 'bajo'] }, { entradas: ['20', '4', '1', '9'], buscar: ['suficiente', 'bajo', 'bajo', 'suficiente'] }],
+    sol: 'Algoritmo Inventario\n    Definir cantidades, i, j Como Entero\n    Dimension cantidades[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Cantidad del estante ", i, ", producto ", j, ":"\n            Leer cantidades[i,j]\n            Si cantidades[i,j] < 5 Entonces\n                Escribir "Estante ", i, ", producto ", j, ": bajo"\n            SiNo\n                Escribir "Estante ", i, ", producto ", j, ": suficiente"\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' },
+  { id: 'mat-signos', titulo: '7. Separar pares, impares y negativos', condicional: true, mod: true,
+    enunciado: 'Crea una matriz de 2 × 2. Pide cuatro números y, para cada uno, muestra «negativo» si es menor que 0; si no, «par» o «impar».',
+    pista: 'Primero se pregunta si es negativo; en el SiNo, otro Si con MOD 2 = 0.',
+    pruebas: [{ entradas: ['-3', '4', '7', '0'], buscar: ['negativo', 'par', 'impar', 'par'] }, { entradas: ['10', '-8', '9', '-1'], buscar: ['par', 'negativo', 'impar', 'negativo'] }],
+    sol: 'Algoritmo Numeros\n    Definir numeros, i, j Como Entero\n    Dimension numeros[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese un número:"\n            Leer numeros[i,j]\n            Si numeros[i,j] < 0 Entonces\n                Escribir numeros[i,j], " es negativo"\n            SiNo\n                Si numeros[i,j] MOD 2 = 0 Entonces\n                    Escribir numeros[i,j], " es par"\n                SiNo\n                    Escribir numeros[i,j], " es impar"\n                FinSi\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' }
+];
 
 const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /* ¿Aparecen esas palabras o números, en ese orden, como palabras sueltas? («par» no vale dentro de «impar») */
@@ -482,6 +501,6 @@ function diccionario(lang) {
   g.capitulos.forEach(c => c.palabras.forEach(w => out.push(Object.assign({ capitulo: c.id, tituloCapitulo: c.titulo }, w))));
   return out.sort((a, b) => a.palabra.localeCompare(b.palabra, 'es'));
 }
-const Estudio = { guias, LANGS, prepara, diccionario, corrigeMatriz, buscaEnOrden };
+const Estudio = { guias, LANGS, prepara, diccionario, corrigeMatriz, buscaEnOrden, MATRIZ_EJ, MATRIZ_EXTRA };
 if (typeof module !== 'undefined' && module.exports) module.exports = Estudio; else raiz.Estudio = Estudio;
 })(typeof window !== 'undefined' ? window : globalThis);

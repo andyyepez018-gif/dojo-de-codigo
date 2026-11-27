@@ -112,6 +112,25 @@ a { color: var(--ai); }
 .requisitos li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .requisitos li .pila { gap: 1px; }
 .requisitos li.si b { color: var(--bien); } .requisitos li.no b { color: var(--mal); }
+.personal-acceso { border-color: var(--ai); }
+.metas-personal { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.meta-personal { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--hundido); }
+.indice-personal { margin: 4px 0 0; padding-left: 0; list-style: none; display: grid; gap: 2px; }
+.indice-personal .btn { text-align: left; white-space: normal; }
+.clave-personal { padding: 10px 12px; border-radius: 10px; background: var(--ai-suave); border-left: 4px solid var(--ai); }
+.visual-personal { display: grid; gap: 8px; }
+.matriz-visual { display: grid; gap: 6px; max-width: 420px; align-items: center; }
+.matriz-visual .cab { font-size: 12px; color: var(--tinta-2); text-align: center; }
+.matriz-visual .fila-cab { text-align: right; padding-right: 4px; }
+.matriz-visual .celda { min-height: 48px; border-radius: 10px; border: 1px solid var(--pizarra-borde); background: var(--pizarra); color: var(--pz-texto); font: 600 16px/1 var(--f-codigo); cursor: pointer; }
+.matriz-visual .celda:disabled { cursor: default; opacity: 1; }
+.matriz-visual .celda.visitada { background: color-mix(in srgb, var(--pizarra) 70%, var(--bien) 30%); }
+.matriz-visual .celda.actual { background: var(--ai); color: var(--sobre-ai); border-color: var(--ai); }
+.celda-info { margin: 0; min-height: 1.5em; font-weight: 500; }
+.texto-chat { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sugerencias { gap: 6px; }
+.btn.hecho { background: var(--bien-suave); color: var(--bien); border-color: transparent; }
+.rubrica-tabla td.num { text-align: center; }
 .nav-capitulos { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
 .nav-capitulos select { width: 100%; min-width: 0; text-overflow: ellipsis; }
 @media (max-width: 560px) {
@@ -543,6 +562,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="contenido.js"></script>
 <script src="escribir.js"></script>
 <script src="estudio.js"></script>
+<script src="personalizado.js"></script>
 <script src="ingles.js"></script>
 <script src="habla.js"></script>
 <script src="nucleo.js"></script>

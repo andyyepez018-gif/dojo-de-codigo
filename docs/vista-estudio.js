@@ -6,13 +6,14 @@
 raiz.VistaEstudio = function (ctx) {
   const { D, G, W, M, U, ir, aviso, abrirLab, vista } = ctx;
   const { $, h, ls, NL, bloqueCodigo, salidaBloque } = U;
-  const st = { lang: ls.get('estudio-lang', null), modo: 'inicio', cap: 0, busca: '', prueba: null, practica: {} };
+  const st = { lang: ls.get('estudio-lang', null), modo: 'inicio', cap: 0, busca: '', prueba: null, practica: {}, personal: null, chat: {} };
+  const Pz = ctx.Personalizado || raiz.Personalizado;
   const guia = () => G.guias[st.lang];
   const leidos = () => ls.get('estudio-leidos-' + st.lang, {});
   const marcaLeido = id => { const x = leidos(); if (!x[id]) { x[id] = true; ls.set('estudio-leidos-' + st.lang, x); } };
   /* Cada cambio de pantalla dentro de la guía queda en el historial: el botón «atrás» del móvil o del
      navegador vuelve al capítulo (o a la pantalla) de antes en vez de salir de la sección. */
-  const foto = () => ({ modo: st.modo, cap: st.cap, lang: st.lang });
+  const foto = () => ({ modo: st.modo, cap: st.cap, lang: st.lang, personal: st.personal });
   const ir_ = (modo, extra) => {
     try { if (!(history.state && history.state.estudio)) history.replaceState({ estudio: foto() }, '', location.hash || '#estudio'); } catch (e) { /* sin historial */ }
     Object.assign(st, { modo }, extra || {}); pinta(); window.scrollTo(0, 0);
@@ -24,7 +25,7 @@ raiz.VistaEstudio = function (ctx) {
     if (vista() === 'estudio') { pinta(); window.scrollTo(0, 0); }
   });
   const ejecuta = (codigo, entradas) => { try { return M.correr(G.prepara(codigo, st.lang, D), st.lang, entradas); } catch (e) { return { salida: '', error: { message: String(e.message || e), linea: 0 } }; } };
-  const cabecera = (titulo, sub) => h('div', { class: 'entre' }, h('div', { class: 'fila' }, st.modo !== 'idioma' ? h('button', { class: 'btn plano', onclick: () => ir_('idioma') }, `← Guía de ${guia().nombre}`) : h('button', { class: 'btn plano', onclick: () => ir_('inicio', { lang: null }) }, '← Elegir lenguaje')), h('span', { class: 'insignia' }, 'Sin puntos: aquí se estudia'));
+  const cabecera = (titulo, sub) => h('div', { class: 'entre' }, h('div', { class: 'fila' }, st.modo === 'personal' ? h('button', { class: 'btn plano', onclick: () => ir_('inicio') }, '← Estudio') : st.modo !== 'idioma' ? h('button', { class: 'btn plano', onclick: () => ir_('idioma') }, `← Guía de ${guia().nombre}`) : h('button', { class: 'btn plano', onclick: () => ir_('inicio', { lang: null }) }, '← Elegir lenguaje')), h('span', { class: 'insignia' }, 'Sin puntos: aquí se estudia'));
 
   /* ── Un ejemplo que se puede ejecutar aquí mismo ── */
   function ejemplo(ej) {
@@ -50,6 +51,7 @@ raiz.VistaEstudio = function (ctx) {
       c.errores.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Errores típicos'),
         h('ul', { class: 'errores-estudio' }, ...c.errores.map(x => h('li', null, h('b', null, x.pasa), h('span', null, 'Por qué: ' + x.porque), h('span', { class: 'arreglo' }, 'Cómo se arregla: ', h('span', { class: 'mono' }, x.arreglo)))))) : null,
       tareas.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Practica escribiendo (sin puntos)'), h('p', { class: 'tenue' }, 'Escríbelo tú. Se comprueba ejecutándolo; aquí no se gana ni se pierde nada, y puedes ver la solución cuando quieras.'), ...tareas.map(practica)) : null,
+      c.id === 'arreglos' && st.lang === 'ps' && Pz ? h('p', { class: 'insignia ai', style: 'white-space:normal' }, 'Tienes un capítulo personalizado de matrices hecho con la presentación de tu clase, con Claude explicándote: ', h('button', { class: 'btn chico', onclick: () => ir_('personal', { personal: 'matrices-condicionales' }) }, 'Abrirlo')) : null,
       c.ejercicios && st.lang === 'ps' ? h('section', { class: 'tarjeta', id: 'ejercicios-matrices' }, h('h2', null, 'Ejercicios de matrices, como los de clase'),
         h('p', { class: 'tenue' }, 'Escríbelos completos, con Algoritmo y FinAlgoritmo. Cada uno se corrige ejecutándolo con datos de prueba y con la rúbrica de 5 puntos de clase. Aquí no se ganan ni se pierden puntos del Dojo.'),
         ...c.ejercicios.map(practicaMatriz)) : null,
@@ -79,9 +81,9 @@ raiz.VistaEstudio = function (ctx) {
   }
 
   /* Un ejercicio de matrices: se corrige con pruebas y con la rúbrica de clase */
-  function practicaMatriz(ej) {
+  function practicaMatriz(ej, op = {}) {
     const p = st.practica[ej.id] || (st.practica[ej.id] = { codigo: '', res: null, sol: false, pista: false });
-    const comprueba = () => { if (!p.codigo.trim()) { aviso('Escribe tu programa primero.'); return; } p.res = G.corrigeMatriz(ej, p.codigo, M); pinta(); };
+    const comprueba = () => { if (!p.codigo.trim()) { aviso('Escribe tu programa primero.'); return; } p.res = G.corrigeMatriz(ej, p.codigo, M); if (p.res.ok && op.alAprobar) op.alAprobar(ej.id); pinta(); };
     const r = p.res;
     return h('div', { class: 'pila practica-estudio', id: 'ej-' + ej.id }, h('h3', null, ej.titulo), h('p', { class: 'enunciado' }, ej.enunciado),
       U.hojaPapel({ id: 'est-' + ej.id, etiqueta: `Tu programa en ${NL.ps}`, lang: 'ps', valor: p.codigo, filas: 10, alCambiar: v => { p.codigo = v; }, alComprobar: comprueba }),
@@ -93,8 +95,135 @@ raiz.VistaEstudio = function (ctx) {
       r ? h('div', { class: 'respuesta ' + (r.ok ? 'si' : 'no'), role: 'status' },
         h('div', { class: 'entre' }, h('h3', null, r.ok ? 'Funciona y cumple la rúbrica' : 'Todavía no'), h('span', { class: 'insignia num ' + (r.puntos === 5 ? 'bien' : 'mal') }, `Rúbrica: ${r.puntos}.0 / 5.0`)),
         h('ul', { class: 'rubrica' }, ...r.rubrica.map(x => h('li', { class: x.ok ? 'si' : 'no' }, h('b', null, (x.ok ? '✓ ' : '✗ ') + x.que), h('span', null, x.nota)))),
-        h('span', { class: 'etiqueta' }, 'Pruebas con datos (se buscan estas palabras o números en lo que muestra, en este orden)'), U.listaPruebas(r.resultados)) : null,
+        h('span', { class: 'etiqueta' }, 'Pruebas con datos (se buscan estas palabras o números en lo que muestra, en este orden)'), U.listaPruebas(r.resultados),
+        op.tutor && ctx.botonTutor ? ctx.botonTutor(r.ok ? 'Que Claude revise mi programa' : 'Que Claude me ayude a arreglarlo', () => `${REGLAS_PROFE}\n\nEjercicio: ${ej.enunciado}\n\nEl programa del alumno:\n${p.codigo}\n\nRúbrica (${r.puntos}/5): ${r.rubrica.map(x => (x.ok ? 'cumple ' : 'NO cumple ') + x.que + ' (' + x.nota + ')').join('; ')}.\nPruebas: ${r.resultados.map(x => 'con ' + x.entradas.join(', ') + (x.ok ? ' bien' : ' mal: ' + (x.error ? 'error ' + x.error.message : 'mostró ' + JSON.stringify(x.salida)))).join('; ')}.\n\n${r.ok ? 'Funciona. Dile en 3 frases qué hizo bien y una cosa que podría escribir más clara.' : 'Explícale en 3 a 6 frases qué falla y cómo pensarlo, señalando la línea. No le des el programa entero: guíalo.'}`) : null) : null,
       p.sol ? bloqueCodigo(ej.sol, 'ps') : null);
+  }
+
+  /* ═══════ Capítulo personalizado: hecho con el material de clase, con Claude de profesor ═══════ */
+  const REGLAS_PROFE = 'Eres el profesor particular de un alumno que está aprendiendo PSeInt desde cero, con el material de su clase. Hablas en español sencillo, de tú, con frases cortas, sin saludos ni felicitaciones y sin formato Markdown (nada de asteriscos, almohadillas ni bloques de código con comillas invertidas: el código va en líneas aparte, tal cual). Usa la sintaxis exacta de PSeInt: Algoritmo … FinAlgoritmo, Definir x Como Entero, Dimension m[2,2], Para i <- 1 Hasta 2 Hacer … FinPara, Si … Entonces … SiNo … FinSi, MOD, Leer, Escribir. En PSeInt las posiciones empiezan en 1 y en m[i,j] primero va la fila y luego la columna. Si te pide la solución de un ejercicio, primero dale una pista y pregúntale qué ha probado; si insiste, dásela explicada línea por línea. Responde en 3 a 8 frases salvo que te pida más, y termina, cuando tenga sentido, con una pregunta corta para comprobar que lo entendió.';
+  const todosEj = () => [...G.MATRIZ_EJ, ...G.MATRIZ_EXTRA];
+  const leidosP = id => ls.get('personal-leidos-' + id, {}) || {};
+  const aprobadosP = id => ls.get('personal-ok-' + id, {}) || {};
+  function accesoPersonales() {
+    if (!Pz || !Pz.capitulos.length) return null;
+    return h('section', { class: 'tarjeta', id: 'personales' }, h('span', { class: 'etiqueta' }, 'Capítulo personalizado'), h('h2', null, 'Hecho con el material de tu clase'),
+      h('p', { class: 'tenue' }, 'Capítulos a medida de lo que te piden en clase, con Claude a tu lado para explicarte cada parte. Sin puntos.'),
+      h('div', { class: 'accesos-estudio' }, ...Pz.capitulos.map(c => {
+        const ejs = c.ejercicios.length, ok = Object.keys(aprobadosP(c.id)).filter(id => c.ejercicios.includes(id)).length, leidas = Object.keys(leidosP(c.id)).length;
+        return h('button', { class: 'tarjeta acceso personal-acceso', onclick: () => ir_('personal', { personal: c.id }) }, h('b', null, c.titulo), h('span', { class: 'tenue' }, `${NL[c.lang]} · ${c.secciones.length} partes · ${ejs} ejercicios`),
+          h('span', { class: 'insignia num' }, `${leidas} de ${c.secciones.length} partes entendidas · ${ok} de ${ejs} ejercicios con 5/5`));
+      })));
+  }
+  function vistaPersonal() {
+    const c = Pz && Pz.porId(st.personal); if (!c) { st.modo = 'inicio'; return vistaInicio(); }
+    st.lang = c.lang;   // los ejemplos se ejecutan en su lenguaje
+    const l = leidosP(c.id), okEj = aprobadosP(c.id), ejs = c.ejercicios.map(id => todosEj().find(e => e.id === id)).filter(Boolean);
+    const leidas = c.secciones.filter(s => l[s.id]).length, hechos = ejs.filter(e => okEj[e.id]).length;
+    const ve = id => { const x = document.getElementById(id); if (x) x.scrollIntoView({ behavior: U.reduceMovimiento && U.reduceMovimiento() ? 'auto' : 'smooth', block: 'start' }); };
+    const entendida = s => h('button', { class: 'btn chico ' + (l[s.id] ? 'hecho' : ''), 'aria-pressed': String(!!l[s.id]), onclick: () => { const x = leidosP(c.id); if (x[s.id]) delete x[s.id]; else x[s.id] = true; ls.set('personal-leidos-' + c.id, x); pinta(); } }, l[s.id] ? '✓ Entendido' : 'Marcar como entendido');
+    const explica = s => ctx.botonTutor ? ctx.botonTutor('Explícamelo con Claude', () => `${REGLAS_PROFE}\n\nEl material del capítulo:\n${Pz.contexto(c)}\n\nEl alumno está leyendo la parte «${s.t}». ${s.claude}`) : null;
+    return h('div', { class: 'columna personal' }, cabecera(),
+      h('section', { class: 'tarjeta portada-estudio' }, h('span', { class: 'etiqueta' }, `Capítulo personalizado · ${NL[c.lang]}`), h('h1', null, c.titulo), h('p', { class: 'tenue' }, c.fuente),
+        h('p', { class: 'objetivo' }, h('b', null, 'Objetivo: '), c.objetivo),
+        h('div', { class: 'metas-personal' }, ...c.metas.map(([t, d], k) => h('div', { class: 'meta-personal' }, h('b', null, `${k + 1}. ${t}`), h('span', { class: 'tenue' }, d)))),
+        h('div', { class: 'fila' }, h('span', { class: 'insignia num' + (leidas === c.secciones.length ? ' bien' : '') }, `${leidas} de ${c.secciones.length} partes entendidas`), h('span', { class: 'insignia num' + (hechos === ejs.length ? ' bien' : '') }, `${hechos} de ${ejs.length} ejercicios con 5/5`)),
+        h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ve('p-' + c.secciones[0].id) }, 'Empezar'), h('button', { class: 'btn', onclick: () => ve('p-actividad') }, 'Ir a los ejercicios'), h('button', { class: 'btn', onclick: () => ve('chat-personal') }, 'Hablar con Claude')),
+        h('nav', { 'aria-label': 'Partes del capítulo' }, h('ol', { class: 'indice-personal' }, ...c.secciones.map(s => h('li', null, h('button', { class: 'btn plano chico', onclick: () => ve('p-' + s.id) }, (l[s.id] ? '✓ ' : '') + s.t))),
+          h('li', null, h('button', { class: 'btn plano chico', onclick: () => ve('p-actividad') }, '8. Ahora es tu turno: los ejercicios')), h('li', null, h('button', { class: 'btn plano chico', onclick: () => ve('p-evaluacion') }, '9. Cómo se evalúa')), h('li', null, h('button', { class: 'btn plano chico', onclick: () => ve('p-cierre') }, '10. Lo esencial y tus preguntas'))))),
+      ...c.secciones.map(s => h('section', { class: 'tarjeta seccion-personal', id: 'p-' + s.id }, h('span', { class: 'etiqueta' }, s.etiqueta), h('h2', null, s.t),
+        ...s.p.map(x => h('p', null, x)),
+        s.visual ? visualPersonal(s.visual) : null,
+        h('p', { class: 'clave-personal' }, h('b', null, 'Idea clave: '), s.clave),
+        ...s.ejemplos.map(ejemplo),
+        s.errores.length ? h('div', null, h('h3', null, 'Errores típicos'), h('ul', { class: 'errores-estudio' }, ...s.errores.map(x => h('li', null, h('b', null, x.pasa), h('span', null, 'Por qué: ' + x.porque), h('span', { class: 'arreglo' }, 'Cómo se arregla: ', h('span', { class: 'mono' }, x.arreglo)))))) : null,
+        h('div', { class: 'fila' }, entendida(s)), explica(s))),
+      h('section', { class: 'tarjeta', id: 'p-actividad' }, h('span', { class: 'etiqueta' }, 'Actividad · trabajo individual'), h('h2', null, '8. Ahora es tu turno'),
+        h('p', null, 'Resuelve los ejercicios sin copiar una solución. Lee el enunciado, identifica las filas y las columnas y planifica los ciclos antes de escribir. Usa condicionales solo cuando el ejercicio necesite tomar una decisión. Tiempo sugerido: 15 a 20 minutos por ejercicio.'),
+        h('p', { class: 'tenue' }, 'Los 4 primeros son los de la presentación; del 5 al 7, los «ejemplos cotidianos» convertidos en ejercicios. Cada uno se corrige ejecutándolo con dos grupos de datos y con la rúbrica de 5 puntos de tu profesor. Escríbelos completos, con Algoritmo y FinAlgoritmo.'),
+        ...ejs.map(e => practicaMatriz(e, { tutor: true, alAprobar: id => { const x = aprobadosP(c.id); x[id] = true; ls.set('personal-ok-' + c.id, x); } }))),
+      h('section', { class: 'tarjeta', id: 'p-evaluacion' }, h('span', { class: 'etiqueta' }, 'Criterios de evaluación'), h('h2', null, '9. ¿Cómo se revisa la actividad?'),
+        h('table', { class: 'chuleta rubrica-tabla' }, h('thead', null, h('tr', null, h('th', null, 'Criterio'), h('th', null, 'Qué se mira'), h('th', null, 'Puntos'))),
+          h('tbody', null, ...c.rubrica.map(([t, d]) => h('tr', null, h('td', null, h('b', null, t)), h('td', null, d), h('td', { class: 'num' }, '1.0'))), h('tr', null, h('td', null, h('b', null, 'Total')), h('td', null, ''), h('td', { class: 'num' }, h('b', null, '5.0'))))),
+        h('p', { class: 'tenue' }, 'Antes de entregar, repasa: ¿Definir y Dimension con el tamaño correcto? ¿Dos Para (filas y columnas) con su FinPara? ¿Leer matriz[i,j]? ¿El Si solo donde hay que decidir, con su FinSi? ¿Lo probaste con varios datos?')),
+      h('section', { class: 'tarjeta', id: 'p-cierre' }, h('span', { class: 'etiqueta' }, 'Cierre'), h('h2', null, '10. Lo esencial que debes recordar'),
+        h('ul', { class: 'lista sabe' }, ...c.cierre.map(x => h('li', null, x))),
+        h('p', null, '¿Qué pregunta te queda antes de los ejercicios? Házsela a Claude aquí abajo.')),
+      chatPersonal(c));
+  }
+  /* Las imágenes que se pueden tocar: la matriz con sus casillas y el recorrido paso a paso */
+  function visualPersonal(v) {
+    const nombre = v.nombre, filas = v.valores ? v.valores.length : v.filas, cols = v.valores ? v.valores[0].length : v.columnas;
+    const valor = (f, c) => (v.valores ? v.valores[f - 1][c - 1] : null);
+    const info = h('p', { class: 'celda-info', 'aria-live': 'polite' });
+    const celdas = [];
+    const rejilla = h('div', { class: 'matriz-visual', style: `grid-template-columns: auto repeat(${cols}, minmax(0, 1fr))`, role: 'group', 'aria-label': `Matriz ${nombre} de ${filas} filas por ${cols} columnas` },
+      h('span', { class: 'esquina', 'aria-hidden': 'true' }), ...Array.from({ length: cols }, (_, c) => h('span', { class: 'cab', 'aria-hidden': 'true' }, `columna ${c + 1}`)));
+    for (let f = 1; f <= filas; f++) {
+      rejilla.append(h('span', { class: 'cab fila-cab', 'aria-hidden': 'true' }, `fila ${f}`));
+      for (let c = 1; c <= cols; c++) {
+        const b = h('button', { class: 'celda', type: 'button', 'aria-label': `${nombre}[${f},${c}]` + (v.valores ? ` vale ${valor(f, c)}` : '') }, v.valores ? String(valor(f, c)) : `[${f},${c}]`);
+        celdas.push({ b, f, c }); rejilla.append(b);
+      }
+    }
+    const marca = (f, c, visitadas) => celdas.forEach(x => { x.b.classList.toggle('actual', x.f === f && x.c === c); x.b.classList.toggle('visitada', !!visitadas && visitadas.some(([a, d]) => a === x.f && d === x.c)); });
+    if (v.tipo === 'recorrido') {
+      const orden = []; for (let f = 1; f <= filas; f++) for (let c = 1; c <= cols; c++) orden.push([f, c]);
+      let k = -1;
+      const muestra = () => {
+        if (k < 0) { marca(0, 0, []); info.textContent = 'Pulsa «Siguiente» para empezar el recorrido.'; return; }
+        const [f, c] = orden[k]; marca(f, c, orden.slice(0, k));
+        info.textContent = `Paso ${k + 1} de ${orden.length}: el Para de fuera tiene i = ${f} (fila ${f}); el de dentro, j = ${c} (columna ${c}). Se visita ${nombre}[${f},${c}].` + (c === cols && f < filas ? ' Al terminar la fila, j vuelve a 1 e i pasa a la siguiente fila.' : k === orden.length - 1 ? ' Fin: se visitaron todas las casillas.' : '');
+      };
+      celdas.forEach(x => { x.b.disabled = true; });
+      const ant = h('button', { class: 'btn chico', type: 'button', onclick: () => { k = Math.max(-1, k - 1); muestra(); } }, '← Anterior');
+      const sig = h('button', { class: 'btn chico primario', type: 'button', onclick: () => { k = Math.min(orden.length - 1, k + 1); muestra(); } }, 'Siguiente →');
+      muestra();
+      return h('div', { class: 'visual-personal' }, rejilla, info, h('div', { class: 'fila' }, ant, sig, h('button', { class: 'btn chico plano', type: 'button', onclick: () => { k = -1; muestra(); } }, 'Volver a empezar')));
+    }
+    celdas.forEach(x => x.b.addEventListener('click', () => { marca(x.f, x.c); info.textContent = `${nombre}[${x.f},${x.c}]` + (v.valores ? ` = ${valor(x.f, x.c)}` : '') + ` → fila ${x.f}, columna ${x.c}. Primero la fila, después la columna.`; }));
+    info.textContent = 'Toca una casilla para ver su nombre.';
+    return h('div', { class: 'visual-personal' }, rejilla, info);
+  }
+  /* Claude de profesor: conversación sobre el capítulo, con el material de la clase */
+  function chatPersonal(c) {
+    const s = ctx.sample && ctx.sample();
+    const ch = st.chat[c.id] || (st.chat[c.id] = { log: (ls.get('personal-chat-' + c.id, []) || []).slice(-30), pensando: false });
+    const campo = h('textarea', { class: 'campo', id: 'chat-personal-texto', rows: '2', placeholder: 'Pregúntale lo que quieras: qué es i y j, por qué falla tu programa, que te ponga otro ejercicio…', 'aria-label': 'Tu pregunta para Claude' });
+    const prompt = t => `${REGLAS_PROFE}\n\nEl material del capítulo:\n${Pz.contexto(c)}\n\nPregunta del alumno: ${t}`;
+    if (!s) {
+      return h('section', { class: 'tarjeta', id: 'chat-personal' }, h('span', { class: 'etiqueta' }, 'Tu profesor'), h('h2', null, 'Pregúntale a Claude'),
+        h('p', { class: 'tenue' }, 'Claude contesta aquí dentro cuando usas la versión de Claude del Dojo. En esta versión, escribe tu pregunta y cópiala con todo el capítulo: pégala en un chat de Claude y te lo explica con el material de tu clase.'),
+        campo, h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: async () => { const t = campo.value.trim() || '¿Qué es lo más importante de este capítulo?'; if (await U.copia(prompt(t))) aviso('Pregunta copiada con el capítulo. Pégala en Claude.', 5000); else aviso('No se pudo copiar.'); } }, 'Copiar mi pregunta para Claude')));
+    }
+    const lista = h('ol', { class: 'chat' }, ...(ch.log.length ? [] : [h('li', { class: 'nota' }, 'Pregúntale lo que no entiendas. Conoce todo este capítulo y la rúbrica de tu profesor.')]),
+      ...ch.log.map(m => h('li', { class: 'burbuja ' + (m.quien === 'yo' ? 'yo' : 'ella') }, h('span', { class: 'quien' }, m.quien === 'yo' ? 'Tú' : 'Claude'), h('span', { class: 'texto-chat' }, m.texto || '…'))));
+    const envia = async texto => {
+      texto = String(texto || '').trim(); if (!texto || ch.pensando) return;
+      const sm = ctx.sample && ctx.sample(); if (!sm) return;
+      ch.log.push({ quien: 'yo', texto }); const resp = { quien: 'claude', texto: '' }; ch.log.push(resp); ch.pensando = true; pinta();
+      const ultima = () => { const b = document.querySelectorAll('#chat-personal .burbuja .texto-chat'); return b[b.length - 1]; };
+      const hist = ch.log.slice(0, -1).slice(-12), mensajes = [];
+      for (const m of hist) { const role = m.quien === 'yo' ? 'user' : 'assistant'; if (!m.texto) continue; if (mensajes.length && mensajes[mensajes.length - 1].role === role) mensajes[mensajes.length - 1].content += '\n' + m.texto; else mensajes.push({ role, content: m.texto }); }
+      while (mensajes.length && mensajes[0].role !== 'user') mensajes.shift();
+      if (mensajes.length) mensajes[0].content = prompt(mensajes[0].content);
+      try {
+        const { text } = await sm(mensajes, { modelTier: 'quick', cache: false, onText: ({ text: t }) => { resp.texto = t; const b = ultima(); if (b) b.textContent = t; } });
+        resp.texto = text;
+      } catch (e) {
+        ch.log.pop();
+        if (e && ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled'].includes(e.code)) { if (ctx.apagaTutor) ctx.apagaTutor(); aviso('Claude no está disponible aquí.'); }
+        else aviso(e && e.code === 'rate_limited' ? 'Has usado mucho a Claude ahora mismo. Prueba en un rato.' : 'No se pudo preguntar a Claude. Prueba otra vez.', 4500);
+      }
+      ch.pensando = false; ls.set('personal-chat-' + c.id, ch.log.slice(-30)); pinta();
+      const t = document.getElementById('chat-personal'); if (t) t.scrollIntoView({ block: 'end' });
+    };
+    campo.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envia(campo.value); } });
+    return h('section', { class: 'tarjeta', id: 'chat-personal' }, h('div', { class: 'entre' }, h('div', null, h('span', { class: 'etiqueta' }, 'Tu profesor'), h('h2', null, 'Pregúntale a Claude')), h('span', { class: 'tenue', style: 'font-size:12.5px' }, 'Usa tu cuenta de Claude')),
+      lista, ch.pensando ? h('p', { class: 'tenue', 'aria-live': 'polite' }, 'Claude está escribiendo…') : null,
+      h('div', { class: 'fila sugerencias' }, ...c.sugerencias.map(t => h('button', { class: 'chip', type: 'button', disabled: ch.pensando || null, onclick: () => envia(t) }, t))),
+      campo, h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'chat-personal-enviar', disabled: ch.pensando || null, onclick: () => envia(campo.value) }, 'Preguntar'),
+        ch.log.length ? h('button', { class: 'btn plano', onclick: () => { ch.log = []; ls.set('personal-chat-' + c.id, []); pinta(); } }, 'Empezar otra conversación') : null));
   }
 
   /* ── Chuleta y diccionario ── */
@@ -188,7 +317,7 @@ raiz.VistaEstudio = function (ctx) {
           h('span', { class: 'n', 'aria-hidden': 'true' }, l[c.id] ? '✓' : String(k + 1)), h('span', { class: 'pila', style: 'gap:2px' }, h('b', null, c.titulo), h('span', { class: 'tenue' }, c.objetivo))))))));
   }
   function vistaInicio() {
-    return h('div', { class: 'columna' },
+    return h('div', { class: 'columna' }, accesoPersonales(),
       h('section', { class: 'tarjeta portada-estudio' }, h('span', { class: 'etiqueta' }, 'Estudio intensivo'), h('h1', null, '¿Qué quieres estudiar a fondo?'),
         h('p', null, 'Una guía completa de cada lenguaje, desde cero, como si nunca lo hubieras visto: cada instrucción explicada, ejemplos que puedes ejecutar y cambiar, las palabras una a una, los errores típicos, una chuleta y un laboratorio libre. Ideal para la víspera de una evaluación.'),
         h('p', { class: 'tenue' }, 'Aquí no se ganan ni se pierden puntos, ni cuenta para el rango: es solo para aprender.')),
@@ -200,10 +329,11 @@ raiz.VistaEstudio = function (ctx) {
     const el = $('#v-estudio'); if (!el) return;
     const foco = document.activeElement && document.activeElement.id;
     el.textContent = '';
+    if (st.modo === 'personal') { const c = Pz && Pz.porId(st.personal); if (c) st.lang = c.lang; else st.modo = 'inicio'; }
     if (!st.lang || !G.guias[st.lang]) st.modo = 'inicio';
-    el.append(st.modo === 'capitulo' ? vistaCapitulo() : st.modo === 'chuleta' ? vistaChuleta() : st.modo === 'diccionario' ? vistaDiccionario() : st.modo === 'prueba' && st.prueba ? vistaPrueba() : st.modo === 'lab' ? vistaLab() : st.modo === 'idioma' ? vistaIdioma() : vistaInicio());
+    el.append(st.modo === 'personal' ? vistaPersonal() : st.modo === 'capitulo' ? vistaCapitulo() : st.modo === 'chuleta' ? vistaChuleta() : st.modo === 'diccionario' ? vistaDiccionario() : st.modo === 'prueba' && st.prueba ? vistaPrueba() : st.modo === 'lab' ? vistaLab() : st.modo === 'idioma' ? vistaIdioma() : vistaInicio());
     if (foco && document.getElementById(foco) && el.contains(document.getElementById(foco))) { const x = document.getElementById(foco); x.focus({ preventScroll: true }); if (x.type === 'search') x.setSelectionRange(x.value.length, x.value.length); }
   }
-  return { pinta, inicio: () => { if (st.modo !== 'inicio') st.modo = st.lang ? 'idioma' : 'inicio'; }, estado: st };
+  return { pinta, inicio: () => { if (st.modo !== 'inicio') st.modo = st.lang ? 'idioma' : 'inicio'; }, abrePersonal: id => ir_('personal', { personal: id }), estado: st };
 };
 })(window);

@@ -43,6 +43,14 @@ const srv = http.createServer((q, r) => {
   await p.fill('#editor-codigo', 'print(sum(i for i in range(10)))'); await p.click('#btn-ejecutar');
   await p.locator('#consola', { hasText: /fin del programa/ }).waitFor({ timeout: 15000 });
   ok('el laboratorio ejecuta en el hilo aparte también aquí', /45/.test(await p.textContent('#consola')));
+  // el capítulo personalizado: Claude de profesor, con el material de la clase
+  await p.goto('http://localhost:8771/#estudio'); await p.waitForSelector('#personales'); await p.locator('.personal-acceso').first().click(); await p.waitForSelector('#chat-personal textarea');
+  await p.fill('#chat-personal-texto', '¿Qué es j?'); await p.click('#chat-personal-enviar'); await p.waitForTimeout(400);
+  ok('el chat del capítulo responde con Claude', /Explicación de prueba/.test(await p.textContent('#chat-personal .burbuja.ella')) && /¿Qué es j\?/.test(await p.textContent('#chat-personal .burbuja.yo')));
+  ok('la pregunta lleva el capítulo de la clase y la rúbrica', await p.evaluate(() => { const m = window.__pregunta; const t = Array.isArray(m) ? m.map(x => x.content).join('\n') : String(m); return /Matrices y condicionales/.test(t) && /Resultado y funcionamiento/.test(t) && /¿Qué es j\?/.test(t); }));
+  await p.locator('#chat-personal .sugerencias .chip').first().click(); await p.waitForTimeout(400);
+  ok('las preguntas rápidas también preguntan, y la conversación sigue (2 respuestas)', await p.locator('#chat-personal .burbuja.ella').count() === 2 && await p.evaluate(() => Array.isArray(window.__pregunta) && window.__pregunta.length === 3 && window.__pregunta[1].role === 'assistant'));
+  ok('cada parte tiene «Explícamelo con Claude»', await p.locator('.seccion-personal').getByRole('button', { name: 'Explícamelo con Claude' }).count() === 7);
   await p.goto('http://localhost:8771/#plan');
   ok('el plan enlaza a la app instalable', await p.locator('a[href="https://andyyepez018-gif.github.io/dojo-de-codigo/"]').count() === 1);
   ok('sin errores de JavaScript', errores.length === 0, errores);

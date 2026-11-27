@@ -43,5 +43,19 @@ for (const l of G.LANGS) {
   falla('Dimension de otro tamaño no cumple', 'mat-mostrar', por('mat-mostrar').sol.replace('numeros[2,2]', 'numeros[3,3]'), 'Declaración y dimensionamiento');
   ok('«par» no se confunde con «impar»', !G.buscaEnOrden('4 es impar', ['par']) && G.buscaEnOrden('Numero par\nNumero impar', ['par', 'impar']));
   ok('un número no se encuentra dentro de otro', !G.buscaEnOrden('3.15 y 215', ['15']) && G.buscaEnOrden('Total: 15', ['15'])); }
+// El capítulo personalizado «Matrices y condicionales» (hecho con la presentación de clase)
+{ const P = require('../personalizado.js'), c = P.porId('matrices-condicionales');
+  ok('capítulo personalizado: existe y es de PSeInt', c && c.lang === 'ps' && c.secciones.length === 7 && c.metas.length === 4 && c.rubrica.length === 5 && c.cierre.length === 5);
+  for (const s of c.secciones) {
+    ok(`personal/${s.id}: texto, idea clave y pregunta para Claude`, s.p.length >= 2 && s.p.every(x => x.length > 40) && s.clave && s.claude && s.t && s.etiqueta);
+    for (const e of s.ejemplos) { ejemplos++; const r = Motor.correr(e.codigo, 'ps', e.entradas); ok(`personal/${s.id}: el ejemplo se ejecuta sin errores`, !r.error && r.salida.trim().length > 0, r.error && r.error.message); }
+  }
+  const todos = [...G.MATRIZ_EJ, ...G.MATRIZ_EXTRA];
+  ok('personal: sus 7 ejercicios existen', c.ejercicios.length === 7 && c.ejercicios.every(id => todos.some(e => e.id === id)));
+  for (const e of G.MATRIZ_EXTRA) { const r = G.corrigeMatriz(e, e.sol, Motor); ok(`extra ${e.id}: la solución saca 5/5`, r.ok && r.puntos === 5, r.rubrica.filter(x => !x.ok)); }
+  ok('extra: «niño» con ñ se encuentra', G.buscaEnOrden('8: niño', ['niño']) && !G.buscaEnOrden('niños', ['niño']));
+  const sinAnidar = G.MATRIZ_EXTRA[0].sol.replace(/Si edades\[i,j\] < 13 Entonces[\s\S]*?FinSi\n            FinSi/, 'Escribir "adulto"');
+  ok('extra: sin los condicionales, edades no pasa', !G.corrigeMatriz(G.MATRIZ_EXTRA[0], sinAnidar, Motor).ok);
+  const ctxP = P.contexto(c); ok('el contexto para Claude lleva todo el capítulo y la rúbrica', /Matrices y condicionales/.test(ctxP) && /MOD/.test(ctxP) && /Resultado y funcionamiento/.test(ctxP) && ctxP.length < 9000, ctxP.length); }
 console.log(`Ejemplos ejecutados: ${ejemplos} · palabras explicadas: ${palabras}`);
 console.log(`${bien} bien, ${mal} mal`); process.exit(mal ? 1 : 0);

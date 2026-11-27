@@ -257,7 +257,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.screenshot({ path: path.join(CAPTURAS, '13-ingles-fallo.png') });
   await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
   // hablar: hasta encontrar un ejercicio de hablar y decirlo bien
-  for (let k = 0; k < 40; k++) { if ((await p.textContent('#v-ingles .reto-cab .etiqueta')).trim() === 'Habla') break; await resuelveIngles(p, true); await cierraFiesta(p); await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio'); }
+  for (let k = 0; k < 90; k++) { if ((await p.textContent('#v-ingles .reto-cab .etiqueta')).trim() === 'Habla') break; await resuelveIngles(p, true); await cierraFiesta(p); await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio'); }
   if ((await p.textContent('#v-ingles .reto-cab .etiqueta')).trim() === 'Habla') {
     await resuelveIngles(p, true);
     ok('hablar bien: palabras en verde y correcto', await p.locator('#v-ingles .palabras-dichas .mal').count() === 0 && /Correcto/.test(await p.textContent('#v-ingles .respuesta')), await p.textContent('#v-ingles .respuesta'));
@@ -547,6 +547,21 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   { const boton = p.locator('#ej-mat-notas').getByRole('button', { name: 'Ver una solución' }); await boton.scrollIntoViewIfNeeded(); await p.mouse.wheel(0, 120); await pausa(200);
     const antes = await p.evaluate(() => scrollY); await boton.click(); await pausa(300); const despues = await p.evaluate(() => scrollY);
     ok('pulsar un botón de la guía no te lleva al inicio de la página', antes > 500 && Math.abs(antes - despues) < 5, [antes, despues]); }
+  // desde el capítulo 9, el capítulo personalizado de matrices
+  await p.getByRole('button', { name: 'Abrirlo' }).click(); await p.waitForSelector('.seccion-personal');
+  ok('el capítulo personalizado sigue la presentación: 7 partes, 7 ejercicios, rúbrica y cierre', await p.locator('.seccion-personal').count() === 7 && await p.locator('#p-actividad .practica-estudio').count() === 7 && await p.locator('#p-evaluacion tbody tr').count() === 6 && await p.locator('#p-cierre li').count() === 5);
+  await p.locator('#p-que-es .celda').nth(5).click();
+  ok('la matriz de la imagen se puede tocar: dice el nombre de cada casilla', /m\[2,3\] = 60 → fila 2, columna 3/.test(await p.textContent('#p-que-es .celda-info')), await p.textContent('#p-que-es .celda-info'));
+  for (let k = 0; k < 3; k++) await p.locator('#p-recorrer').getByRole('button', { name: 'Siguiente →' }).click();
+  ok('el recorrido paso a paso enseña i y j', /Paso 3 de 4: .*i = 2.*j = 1/.test(await p.textContent('#p-recorrer .celda-info')) && await p.locator('#p-recorrer .celda.visitada').count() === 2, await p.textContent('#p-recorrer .celda-info'));
+  await p.locator('#p-que-es').getByRole('button', { name: 'Marcar como entendido' }).click();
+  const ejEdades = G.MATRIZ_EXTRA.find(x => x.id === 'mat-edades');
+  await p.fill('#est-mat-edades', ejEdades.sol); await p.locator('#ej-mat-edades').getByRole('button', { name: 'Comprobar' }).click();
+  ok('un ejercicio extra se corrige con la rúbrica y cuenta en el progreso', /5\.0 \/ 5\.0/.test(await p.textContent('#ej-mat-edades')) && /1 de 7 partes entendidas/.test(await p.textContent('.personal .portada-estudio')) && /1 de 7 ejercicios con 5\/5/.test(await p.textContent('.personal .portada-estudio')));
+  ok('fuera de Claude, el chat ofrece copiar la pregunta con el capítulo', await p.locator('#chat-personal').getByRole('button', { name: 'Copiar mi pregunta para Claude' }).count() === 1);
+  await p.screenshot({ path: path.join(CAPTURAS, '32-capitulo-personalizado.png'), fullPage: false });
+  await p.goBack(); await p.waitForSelector('#cap-ir');
+  ok('atrás vuelve al capítulo 9 de la guía', await p.inputValue('#cap-ir') === '8');
   await p.selectOption('#cap-ir', '0'); await p.waitForSelector('.objetivo');
   const t = W.tareas.find(x => x.tema === 'salida');
   await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
