@@ -27,5 +27,21 @@ for (const l of G.LANGS) {
   }
   ok(`${l}: diccionario ordenado`, G.diccionario(l).length >= 50 && G.diccionario(l).every(w => w.capitulo));
 }
+// Ejercicios de matrices como los de clase: las soluciones sacan 5/5 y la corrección detecta los fallos típicos
+{ const ejs = G.guias.ps.capitulos.find(c => c.id === 'arreglos').ejercicios;
+  ok('4 ejercicios de matrices', ejs && ejs.length === 4, ejs && ejs.length);
+  for (const e of ejs) { const r = G.corrigeMatriz(e, e.sol, Motor); ok(`matriz ${e.id}: la solución saca 5/5`, r.ok && r.puntos === 5, r.rubrica.filter(x => !x.ok)); }
+  const por = id => ejs.find(e => e.id === id);
+  const foto = 'Algoritmo Ejercicio_3\n    Definir matriz como entero\n    Definir i,j Como entero\n    dimension matriz[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir " Ingrese un numero : "\n            Leer matriz[i,j]\n            si matriz[i,j] MOD 2 = 0\n                Entonces\n                escribir matriz[i,j]," es par "\n            sino\n                Escribir matriz[i,j]," es impar "\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo';
+  ok('el programa de la clase (Entonces abajo, minúsculas) saca 5/5', G.corrigeMatriz(por('mat-pares'), foto, Motor).puntos === 5);
+  const falla = (n, id, codigo, criterio) => { const r = G.corrigeMatriz(por(id), codigo, Motor); ok(n, !r.ok && r.rubrica.find(x => x.que === criterio && !x.ok), r.rubrica); };
+  falla('pares: si dice siempre «par», no funciona', 'mat-pares', foto.replace('MOD 2 = 0', 'MOD 2 = 0 O Verdadero'), 'Resultado y funcionamiento');
+  falla('pares: sin MOD no cumple condicionales', 'mat-pares', por('mat-pares').sol.replace('matriz[i,j] MOD 2 = 0', 'TRUNC(matriz[i,j] / 2) * 2 = matriz[i,j]'), 'Uso correcto de condicionales');
+  falla('notas: Como Entero no acepta 3.5', 'mat-notas', por('mat-notas').sol.replace('Definir notas Como Real', 'Definir notas Como Entero'), 'Resultado y funcionamiento');
+  falla('suma: sin acumular falla', 'mat-sumar', por('mat-sumar').sol.replace('suma <- suma + numeros[i,j]', 'suma <- numeros[i,j]'), 'Resultado y funcionamiento');
+  falla('sin Definir no cumple la declaración', 'mat-sumar', por('mat-sumar').sol.replace(/    Definir.*\n/, ''), 'Declaración y dimensionamiento');
+  falla('Dimension de otro tamaño no cumple', 'mat-mostrar', por('mat-mostrar').sol.replace('numeros[2,2]', 'numeros[3,3]'), 'Declaración y dimensionamiento');
+  ok('«par» no se confunde con «impar»', !G.buscaEnOrden('4 es impar', ['par']) && G.buscaEnOrden('Numero par\nNumero impar', ['par', 'impar']));
+  ok('un número no se encuentra dentro de otro', !G.buscaEnOrden('3.15 y 215', ['15']) && G.buscaEnOrden('Total: 15', ['15'])); }
 console.log(`Ejemplos ejecutados: ${ejemplos} · palabras explicadas: ${palabras}`);
 console.log(`${bien} bien, ${mal} mal`); process.exit(mal ? 1 : 0);

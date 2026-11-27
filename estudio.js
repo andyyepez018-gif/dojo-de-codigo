@@ -118,6 +118,9 @@ const ps = {
         E('Dimension a[5]\nPara i <- 1 Hasta 5 Hacer\n    Leer a[i]\nFinPara\nmayor <- a[1]\nPara i <- 2 Hasta 5 Hacer\n    Si a[i] > mayor Entonces\n        mayor <- a[i]\n    FinSi\nFinPara\nEscribir "Mayor: ", mayor', '', [4, 9, 2, 7, 5])),
       S('Matrices (dos dimensiones)', ['Una matriz es una tabla: filas y columnas. Dimension m[2,3] crea 2 filas de 3 columnas, y m[fila, columna] es una casilla. Se recorre con un Para dentro de otro.'],
         E('Dimension m[2,3]\nPara f <- 1 Hasta 2 Hacer\n    Para c <- 1 Hasta 3 Hacer\n        m[f,c] <- f * c\n        Escribir m[f,c], " " Sin Saltar\n    FinPara\n    Escribir ""\nFinPara')),
+      S('Matriz + Leer + Si: el ejercicio típico de clase', ['Se juntan tres cosas que ya sabes: dos Para recorren la matriz (i las filas, j las columnas), Leer guarda cada número en su casilla matriz[i,j] y un Si decide qué mostrar. Con MOD 2 se sabe si es par: si el resto de dividir entre 2 es 0, es par; si es 1, es impar.', 'El orden de cada vuelta es siempre el mismo: pedir el dato → guardarlo en matriz[i,j] → evaluar la condición → mostrar el resultado. Fíjate en que «Entonces» puede ir al final de la línea del Si o en la línea de abajo: PSeInt acepta las dos.'],
+        E('Algoritmo ParesEImpares\n    Definir matriz Como Entero\n    Definir i, j Como Entero\n    Dimension matriz[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese un número:"\n            Leer matriz[i,j]\n            Si matriz[i,j] MOD 2 = 0 Entonces\n                Escribir matriz[i,j], " es par"\n            SiNo\n                Escribir matriz[i,j], " es impar"\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo', 'Pruébalo con «Ver paso a paso»: verás cómo i y j cambian y en qué casilla cae cada número.', [4, 7, 10, 3])),
+      S('Cómo te evalúan (rúbrica de 5 puntos)', ['1) Declaración y dimensionamiento: Definir las variables y Dimension con el tamaño correcto (matriz[2,2]). 2) Uso correcto de ciclos: dos Para, uno para las filas (i) y otro dentro para las columnas (j). 3) Almacenamiento de datos: Leer matriz[i,j] guarda cada dato en su casilla. 4) Uso correcto de condicionales: Si … SiNo solo cuando el ejercicio pide decidir algo. 5) Resultado y funcionamiento: el programa hace lo que pide el enunciado.', 'Los ejercicios de abajo se corrigen solos con esta misma rúbrica: te dicen qué punto cumples y cuál te falta.']),
       S('Para Cada', ['Para Cada x de a Hacer recorre todas las casillas del arreglo sin contar posiciones: en cada vuelta, x es una casilla. Si cambias x dentro, cambia la casilla. En una matriz recorre fila por fila.', 'Es cómodo para sumar o mostrar todo; cuando necesitas la posición (por ejemplo «la nota 3»), usa el Para de siempre.'],
         E('Dimension a[4]\na[1] <- 3\na[2] <- 8\na[3] <- 1\na[4] <- 4\nsuma <- 0\nPara Cada x de a Hacer\n    suma <- suma + x\nFinPara\nEscribir "Suma: ", suma'))
     ], [W('Dimension nombre[n]', 'Crea un arreglo de n posiciones.', 'Dimension edades[10]'), W('Dimension m[f,c]', 'Crea una matriz de f filas y c columnas.', 'Dimension tabla[3,4]'), W('Para Cada x de a Hacer', 'Recorre todas las casillas del arreglo; x es la casilla de cada vuelta.', 'Para Cada n de notas Hacer'), W('nombre[i]', 'La caja de la posición i (en PSeInt, de 1 a n).', 'edades[1] <- 20'), W('índice', 'El número de posición dentro del arreglo.', 'a[i]')],
@@ -406,6 +409,69 @@ const cpp = {
   chuleta: [['Estructura', '#include <iostream>\nusing namespace std;\nint main() { … return 0; }'], ['Mostrar', 'cout << "texto" << x << endl;'], ['Pedir un dato', 'cin >> x;   ·   getline(cin, s);'], ['Declarar', 'int n = 0; double d; string s; bool b;'], ['Decidir', 'if (…) { … } else if (…) { … } else { … }'], ['Elegir entre casos', 'switch (x) { case 1: …; break; default: …; }'], ['Repetir mientras', 'while (cond) { … }   ·   do { … } while (cond);'], ['Repetir n veces', 'for (int i = 0; i < n; i++) { … }'], ['Arreglo / vector', 'int a[5];   ·   vector<int> v; v.push_back(x);'], ['División', '/ entera si los dos son int  ·  % resto'], ['Función', 'int f(int x) { return x * 2; }   (antes de main)'], ['Texto', 's.length() · s[i] · s.substr(i, n)'], ['Comentario', '// nota   ·   /* nota */']]
 };
 
+/* Ejercicios de matrices (2 × 2) como los de clase, con corrección automática y la rúbrica de 5 puntos.
+   Cada prueba busca en lo que muestra el programa, en orden, ciertas palabras o números (no importa el resto
+   del texto: los mensajes como «Ingrese un número» son libres). */
+const MATRIZ_EJ = [
+  { id: 'mat-mostrar', titulo: '1. Crear y mostrar una matriz', condicional: false,
+    enunciado: 'Crea una matriz de 2 × 2. Pide cuatro números, guárdalos en la matriz y después muestra los cuatro valores en pantalla.',
+    pista: 'Dos Para para leer y otros dos Para para mostrar.',
+    pruebas: [{ entradas: ['15', '28', '37', '46'], buscar: ['15', '28', '37', '46'] }, { entradas: ['91', '5', '64', '30'], buscar: ['91', '5', '64', '30'] }],
+    sol: 'Algoritmo MostrarMatriz\n    Definir numeros, i, j Como Entero\n    Dimension numeros[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese un número:"\n            Leer numeros[i,j]\n        FinPara\n    FinPara\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Fila ", i, ", columna ", j, ": ", numeros[i,j]\n        FinPara\n    FinPara\nFinAlgoritmo' },
+  { id: 'mat-sumar', titulo: '2. Sumar los elementos', condicional: false,
+    enunciado: 'Crea una matriz de 2 × 2. Pide cuatro números, guárdalos y muestra la suma total.',
+    pista: 'Una variable acumuladora que empieza en 0 y suma cada casilla: suma <- suma + numeros[i,j].',
+    pruebas: [{ entradas: ['15', '28', '37', '46'], buscar: ['126'] }, { entradas: ['100', '250', '5', '45'], buscar: ['400'] }],
+    sol: 'Algoritmo SumarMatriz\n    Definir numeros, i, j, suma Como Entero\n    Dimension numeros[2,2]\n    suma <- 0\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese un número:"\n            Leer numeros[i,j]\n            suma <- suma + numeros[i,j]\n        FinPara\n    FinPara\n    Escribir "La suma total es: ", suma\nFinAlgoritmo' },
+  { id: 'mat-pares', titulo: '3. Identificar pares e impares', condicional: true, mod: true,
+    enunciado: 'Crea una matriz de 2 × 2. Pide cuatro números y, para cada uno, muestra si es par o impar (por ejemplo: «4 es par»).',
+    pista: 'Si numeros[i,j] MOD 2 = 0 Entonces … SiNo … FinSi',
+    pruebas: [{ entradas: ['4', '7', '10', '3'], buscar: ['par', 'impar', 'par', 'impar'] }, { entradas: ['9', '2', '5', '8'], buscar: ['impar', 'par', 'impar', 'par'] }],
+    sol: 'Algoritmo ParesEImpares\n    Definir matriz, i, j Como Entero\n    Dimension matriz[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese un número:"\n            Leer matriz[i,j]\n            Si matriz[i,j] MOD 2 = 0 Entonces\n                Escribir matriz[i,j], " es par"\n            SiNo\n                Escribir matriz[i,j], " es impar"\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' },
+  { id: 'mat-notas', titulo: '4. Clasificar calificaciones', condicional: true,
+    enunciado: 'Crea una matriz de 2 × 2 para guardar cuatro notas. Para cada nota muestra «Aprobado» si es mayor o igual a 3.0, o «Reprobado» si es menor.',
+    pista: 'Las notas llevan decimales: la matriz se define Como Real. Si nota >= 3.0 Entonces … SiNo … FinSi',
+    pruebas: [{ entradas: ['3.5', '2.9', '3', '4.2'], buscar: ['Aprobado', 'Reprobado', 'Aprobado', 'Aprobado'] }, { entradas: ['1.5', '3.0', '2.99', '5'], buscar: ['Reprobado', 'Aprobado', 'Reprobado', 'Aprobado'] }],
+    sol: 'Algoritmo Calificaciones\n    Definir notas Como Real\n    Definir i, j Como Entero\n    Dimension notas[2,2]\n    Para i <- 1 Hasta 2 Hacer\n        Para j <- 1 Hasta 2 Hacer\n            Escribir "Ingrese la nota:"\n            Leer notas[i,j]\n            Si notas[i,j] >= 3.0 Entonces\n                Escribir notas[i,j], ": Aprobado"\n            SiNo\n                Escribir notas[i,j], ": Reprobado"\n            FinSi\n        FinPara\n    FinPara\nFinAlgoritmo' }
+];
+ps.capitulos.find(c => c.id === 'arreglos').ejercicios = MATRIZ_EJ;
+
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/* ¿Aparecen esas palabras o números, en ese orden, como palabras sueltas? («par» no vale dentro de «impar») */
+function buscaEnOrden(texto, buscar) {
+  let desde = 0;
+  for (const b of buscar) {
+    const re = new RegExp('(^|[^\\p{L}\\p{N}.])' + escRe(b) + '(?![\\p{L}\\p{N}])', 'giu'); re.lastIndex = desde;
+    const m = re.exec(texto); if (!m) return false; desde = m.index + m[0].length;
+  }
+  return true;
+}
+/* Corrige un ejercicio de matrices: las pruebas y la rúbrica de clase (5 puntos, uno por criterio) */
+function corrigeMatriz(ej, codigo, M) {
+  const resultados = ej.pruebas.map(pr => {
+    let r; try { r = M.correr(codigo, 'ps', pr.entradas); } catch (e) { r = { salida: '', error: { message: String(e.message || e), linea: 0 } }; }
+    const salida = (r.salida || '').replace(/\n$/, '');
+    return { ok: !r.error && buscaEnOrden(salida, pr.buscar), entradas: pr.entradas, esperado: pr.buscar.join('  …  '), salida, error: r.error };
+  });
+  const limpio = String(codigo || '').split('\n').map(l => l.replace(/"[^"]*"|'[^']*'/g, '""').replace(/\/\/.*$/, '')).join('\n');
+  const tiene = re => re.test(limpio);
+  const dimension = tiene(/\bdimension(ar)?\s+[\p{L}_][\p{L}\p{N}_]*\s*\[\s*2\s*,\s*2\s*\]/iu), definir = tiene(/\bdefinir\b/i);
+  const fors = (limpio.match(/\bpara\s+[\p{L}_][\p{L}\p{N}_]*\s*(<-|=)/giu) || []).length;
+  const leer = tiene(/\bleer\s+[\p{L}_][\p{L}\p{N}_]*\s*\[\s*[\p{L}_][\p{L}\p{N}_]*\s*,\s*[\p{L}_][\p{L}\p{N}_]*\s*\]/iu);
+  const si = tiene(/\bsi\b/i) && tiene(/\bsino\b/i), mod = tiene(/\bmod\b|%/i);
+  const funciona = resultados.every(x => x.ok);
+  const rubrica = [
+    { que: 'Declaración y dimensionamiento', ok: dimension && definir, nota: dimension && definir ? 'Definir y Dimension …[2,2]' : !dimension ? 'Falta Dimension con el tamaño 2 × 2, por ejemplo: Dimension numeros[2,2]' : 'Falta declarar las variables con Definir' },
+    { que: 'Uso correcto de ciclos', ok: fors >= 2, nota: fors >= 2 ? 'Dos Para: filas (i) y columnas (j)' : 'Hacen falta dos Para, uno dentro del otro' },
+    { que: 'Almacenamiento de datos', ok: leer, nota: leer ? 'Leer guarda cada dato en su casilla' : 'Guarda cada dato en su casilla con Leer matriz[i,j]' },
+    ej.condicional
+      ? { que: 'Uso correcto de condicionales', ok: si && (!ej.mod || mod), nota: !si ? 'Falta decidir con Si … SiNo … FinSi' : ej.mod && !mod ? 'Para saber si es par usa MOD 2' : 'Si … SiNo decide cada caso' }
+      : { que: 'Uso correcto de condicionales', ok: true, nota: 'Este ejercicio no necesita decidir nada' },
+    { que: 'Resultado y funcionamiento', ok: funciona, nota: funciona ? 'Hace lo que pide el enunciado' : 'Alguna prueba no da lo esperado (mira abajo)' }
+  ];
+  return { ok: funciona && rubrica.every(x => x.ok), resultados, rubrica, puntos: rubrica.filter(x => x.ok).length };
+}
+
 const guias = { ps, py, cpp };
 const LANGS = ['ps', 'py', 'cpp'];
 /* Para ejecutar un ejemplo: en C++, si no hay main, se completa (con los include que haga falta) */
@@ -416,6 +482,6 @@ function diccionario(lang) {
   g.capitulos.forEach(c => c.palabras.forEach(w => out.push(Object.assign({ capitulo: c.id, tituloCapitulo: c.titulo }, w))));
   return out.sort((a, b) => a.palabra.localeCompare(b.palabra, 'es'));
 }
-const Estudio = { guias, LANGS, prepara, diccionario };
+const Estudio = { guias, LANGS, prepara, diccionario, corrigeMatriz, buscaEnOrden };
 if (typeof module !== 'undefined' && module.exports) module.exports = Estudio; else raiz.Estudio = Estudio;
 })(typeof window !== 'undefined' ? window : globalThis);

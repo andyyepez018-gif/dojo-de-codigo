@@ -98,6 +98,10 @@ a { color: var(--ai); }
 .insignia.bien { background: var(--bien-suave); color: var(--bien); }
 .insignia.ai { background: var(--ai-suave); color: var(--ai-fuerte); }
 .insignia.kihada { background: var(--kihada-suave); color: var(--kihada); }
+.rubrica { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 6px; }
+.rubrica li { display: grid; gap: 1px; }
+.rubrica li.si b { color: var(--bien); } .rubrica li.no b { color: var(--mal); }
+.rubrica li span { font-size: 14px; color: var(--tinta-2, inherit); }
 .nav-capitulos { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
 .nav-capitulos select { width: 100%; min-width: 0; text-overflow: ellipsis; }
 @media (max-width: 560px) {

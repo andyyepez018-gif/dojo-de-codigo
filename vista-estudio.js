@@ -50,6 +50,9 @@ raiz.VistaEstudio = function (ctx) {
       c.errores.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Errores típicos'),
         h('ul', { class: 'errores-estudio' }, ...c.errores.map(x => h('li', null, h('b', null, x.pasa), h('span', null, 'Por qué: ' + x.porque), h('span', { class: 'arreglo' }, 'Cómo se arregla: ', h('span', { class: 'mono' }, x.arreglo)))))) : null,
       tareas.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Practica escribiendo (sin puntos)'), h('p', { class: 'tenue' }, 'Escríbelo tú. Se comprueba ejecutándolo; aquí no se gana ni se pierde nada, y puedes ver la solución cuando quieras.'), ...tareas.map(practica)) : null,
+      c.ejercicios && st.lang === 'ps' ? h('section', { class: 'tarjeta', id: 'ejercicios-matrices' }, h('h2', null, 'Ejercicios de matrices, como los de clase'),
+        h('p', { class: 'tenue' }, 'Escríbelos completos, con Algoritmo y FinAlgoritmo. Cada uno se corrige ejecutándolo con datos de prueba y con la rúbrica de 5 puntos de clase. Aquí no se ganan ni se pierden puntos del Dojo.'),
+        ...c.ejercicios.map(practicaMatriz)) : null,
       c.id === 'errores' ? h('section', { class: 'tarjeta' }, h('h2', null, 'Chuleta'), chuleta()) : null,
       h('div', { class: 'entre' },
         st.cap > 0 ? h('button', { class: 'btn', onclick: () => ir_('capitulo', { cap: st.cap - 1 }) }, `← Anterior: ${g.capitulos[st.cap - 1].titulo}`) : h('span'),
@@ -73,6 +76,25 @@ raiz.VistaEstudio = function (ctx) {
       p.sol ? bloqueCodigo(t.sol[st.lang], st.lang) : null);
     function comprueba() { if (!p.codigo.trim()) { aviso('Escribe tu programa primero.'); return; } p.res = W.corrige(p.codigo, st.lang, t.pruebas, D); pinta(); }
     return caja;
+  }
+
+  /* Un ejercicio de matrices: se corrige con pruebas y con la rúbrica de clase */
+  function practicaMatriz(ej) {
+    const p = st.practica[ej.id] || (st.practica[ej.id] = { codigo: '', res: null, sol: false, pista: false });
+    const comprueba = () => { if (!p.codigo.trim()) { aviso('Escribe tu programa primero.'); return; } p.res = G.corrigeMatriz(ej, p.codigo, M); pinta(); };
+    const r = p.res;
+    return h('div', { class: 'pila practica-estudio', id: 'ej-' + ej.id }, h('h3', null, ej.titulo), h('p', { class: 'enunciado' }, ej.enunciado),
+      U.hojaPapel({ id: 'est-' + ej.id, etiqueta: `Tu programa en ${NL.ps}`, lang: 'ps', valor: p.codigo, filas: 10, alCambiar: v => { p.codigo = v; }, alComprobar: comprueba }),
+      h('div', { class: 'fila' }, h('button', { class: 'btn primario chico', onclick: comprueba }, 'Comprobar'),
+        h('button', { class: 'btn chico plano', onclick: () => { p.pista = !p.pista; pinta(); } }, p.pista ? 'Ocultar la pista' : 'Pista'),
+        h('button', { class: 'btn chico plano', onclick: () => { p.sol = !p.sol; pinta(); } }, p.sol ? 'Ocultar la solución' : 'Ver una solución'),
+        h('button', { class: 'btn chico plano', onclick: () => abrirLab({ lang: 'ps', codigo: p.codigo.trim() ? p.codigo : ej.sol, entradas: ej.pruebas[0].entradas, traza: true }) }, 'Ver paso a paso')),
+      p.pista ? h('p', { class: 'tenue' }, 'Pista: ', h('span', { class: 'mono' }, ej.pista)) : null,
+      r ? h('div', { class: 'respuesta ' + (r.ok ? 'si' : 'no'), role: 'status' },
+        h('div', { class: 'entre' }, h('h3', null, r.ok ? 'Funciona y cumple la rúbrica' : 'Todavía no'), h('span', { class: 'insignia num ' + (r.puntos === 5 ? 'bien' : 'mal') }, `Rúbrica: ${r.puntos}.0 / 5.0`)),
+        h('ul', { class: 'rubrica' }, ...r.rubrica.map(x => h('li', { class: x.ok ? 'si' : 'no' }, h('b', null, (x.ok ? '✓ ' : '✗ ') + x.que), h('span', null, x.nota)))),
+        h('span', { class: 'etiqueta' }, 'Pruebas con datos (se buscan estas palabras o números en lo que muestra, en este orden)'), U.listaPruebas(r.resultados)) : null,
+      p.sol ? bloqueCodigo(ej.sol, 'ps') : null);
   }
 
   /* ── Chuleta y diccionario ── */

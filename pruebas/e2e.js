@@ -373,7 +373,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await c.close();
 
   console.log('15. Escribir código: completar líneas, escribir desde cero y el proyecto del rango');
-  const W = require('../escribir.js');
+  const W = require('../escribir.js'); const G = require('../estudio.js');
   ({ c, p } = await nueva(b, { viewport: { width: 1280, height: 900 } }, { v: 2, bienvenida: true, puntos: 2000, examenes: {}, ajustes: { lang: 'py' },
     temas: { salida: { ultimos: [1, 1, 1, 1, 1, 1, 1, 1], intentos: 8, aciertos: 8 } } }, modoPruebas));
   await p.goto(URL + '#retos'); await p.waitForSelector('.reto');
@@ -502,6 +502,17 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.goBack(); await p.waitForSelector('.capitulos');
   ok('y un atrás más vuelve a la portada de la guía', await p.locator('.capitulo').count() === 12);
   ok('adelante vuelve al capítulo 1', await capituloTras(() => p.goForward()) === '1');
+  // ejercicios de matrices como los de clase: corrección con la rúbrica de 5 puntos
+  await p.selectOption('#cap-ir', '8'); await p.waitForSelector('#ejercicios-matrices');
+  ok('el capítulo de arreglos trae los 4 ejercicios de matrices', await p.locator('#ejercicios-matrices .practica-estudio').count() === 4);
+  const ejPares = G.guias.ps.capitulos.find(x => x.id === 'arreglos').ejercicios.find(x => x.id === 'mat-pares');
+  await p.fill('#est-mat-pares', ejPares.sol.replace('Definir matriz, i, j Como Entero\n', ''));
+  await p.locator('#ej-mat-pares').getByRole('button', { name: 'Comprobar' }).click();
+  ok('rúbrica: sin Definir da 4.0 / 5.0 y dice qué falta', /4\.0 \/ 5\.0/.test(await p.textContent('#ej-mat-pares')) && /Falta declarar las variables con Definir/.test(await p.textContent('#ej-mat-pares .rubrica')));
+  await p.fill('#est-mat-pares', ejPares.sol); await p.locator('#ej-mat-pares').getByRole('button', { name: 'Comprobar' }).click();
+  ok('rúbrica: la solución completa da 5.0 / 5.0', /5\.0 \/ 5\.0/.test(await p.textContent('#ej-mat-pares')) && /Funciona y cumple la rúbrica/.test(await p.textContent('#ej-mat-pares')));
+  await p.screenshot({ path: path.join(CAPTURAS, '31-estudio-matrices.png'), fullPage: false });
+  await p.selectOption('#cap-ir', '0'); await p.waitForSelector('.objetivo');
   const t = W.tareas.find(x => x.tema === 'salida');
   await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
   ok('practicar escribiendo: se corrige', /Funciona/.test(await p.textContent('.practica-estudio')));
