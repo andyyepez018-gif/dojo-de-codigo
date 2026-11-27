@@ -219,7 +219,7 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   ok('llegar a 300 puntos abre el examen de «Estudiante de código», pero no sube solo', fiesta && /Aprendiz/.test(await p.textContent('#rango-lateral')));
   // forzar frases (unidad con ejercicios ya hechos): practicar la unidad 1 hasta ver frases y el micrófono
   const vistosFrase = new Set();
-  for (let k = 0; k < 30 && !(vistosFrase.has('habla') && vistosFrase.has('ordenar') && vistosFrase.size >= 4); k++) {
+  for (let k = 0; k < 80 && !(vistosFrase.has('habla') && vistosFrase.has('ordenar') && vistosFrase.size >= 4); k++) {
     const t = await resuelveIngles(p, true); vistosFrase.add(t); await cierraFiesta(p);
     if (!(await p.locator('#v-ingles .respuesta.si').count())) { sumaOk = false; console.log('     no aceptó la respuesta buena de', t); }
     await p.locator('#ing-siguiente').click(); await p.waitForSelector('#v-ingles .ejercicio');
@@ -486,6 +486,22 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.screenshot({ path: path.join(CAPTURAS, '30-estudio-capitulo.png'), fullPage: true });
   await p.getByRole('button', { name: /Mostrar en pantalla: Escribir →/ }).click(); await p.waitForSelector('.palabras-estudio');
   ok('cada capítulo explica sus palabras y errores típicos', /Sin Saltar/.test(await p.textContent('.palabras-estudio')) && await p.locator('.errores-estudio li').count() >= 2);
+  // moverse entre capítulos desde arriba y con el botón «atrás»
+  await p.click('#cap-siguiente'); await p.waitForSelector('.objetivo');
+  ok('arriba: «Siguiente →» pasa al capítulo 3', /capítulo 3 de 12/.test(await p.textContent('#v-estudio .etiqueta')));
+  await p.click('#cap-anterior'); await p.waitForSelector('.objetivo');
+  ok('arriba: «← Anterior» vuelve al capítulo 2', /capítulo 2 de 12/.test(await p.textContent('#v-estudio .etiqueta')));
+  await p.selectOption('#cap-ir', '8'); await p.waitForSelector('.objetivo');
+  ok('el selector lleva a cualquier capítulo', /Arreglos/.test(await p.textContent('#v-estudio h1')) && await p.inputValue('#cap-ir') === '8');
+  await p.goBack(); await p.waitForSelector('.objetivo');
+  ok('el botón atrás del navegador vuelve al capítulo de antes', /capítulo 2 de 12/.test(await p.textContent('#v-estudio .etiqueta')), await p.textContent('#v-estudio .etiqueta'));
+  const capituloTras = async mover => { await mover(); await p.waitForTimeout(150); return (await p.textContent('#v-estudio .etiqueta')).match(/capítulo (\d+)/)?.[1]; };
+  const recorrido = [];
+  for (let i = 0; i < 3; i++) recorrido.push(await capituloTras(() => p.goBack()));
+  ok('atrás repite el camino al revés (3, 2, 1)', recorrido.join() === '3,2,1', recorrido);
+  await p.goBack(); await p.waitForSelector('.capitulos');
+  ok('y un atrás más vuelve a la portada de la guía', await p.locator('.capitulo').count() === 12);
+  ok('adelante vuelve al capítulo 1', await capituloTras(() => p.goForward()) === '1');
   const t = W.tareas.find(x => x.tema === 'salida');
   await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
   ok('practicar escribiendo: se corrige', /Funciona/.test(await p.textContent('.practica-estudio')));

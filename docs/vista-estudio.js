@@ -10,7 +10,19 @@ raiz.VistaEstudio = function (ctx) {
   const guia = () => G.guias[st.lang];
   const leidos = () => ls.get('estudio-leidos-' + st.lang, {});
   const marcaLeido = id => { const x = leidos(); if (!x[id]) { x[id] = true; ls.set('estudio-leidos-' + st.lang, x); } };
-  const ir_ = (modo, extra) => { Object.assign(st, { modo }, extra || {}); pinta(); window.scrollTo(0, 0); };
+  /* Cada cambio de pantalla dentro de la guía queda en el historial: el botón «atrás» del móvil o del
+     navegador vuelve al capítulo (o a la pantalla) de antes en vez de salir de la sección. */
+  const foto = () => ({ modo: st.modo, cap: st.cap, lang: st.lang });
+  const ir_ = (modo, extra) => {
+    try { if (!(history.state && history.state.estudio)) history.replaceState({ estudio: foto() }, '', location.hash || '#estudio'); } catch (e) { /* sin historial */ }
+    Object.assign(st, { modo }, extra || {}); pinta(); window.scrollTo(0, 0);
+    try { history.pushState({ estudio: foto() }, '', location.hash || '#estudio'); } catch (e) { /* sin historial */ }
+  };
+  window.addEventListener('popstate', e => {
+    const s = e.state && e.state.estudio; if (!s || location.hash !== '#estudio') return;
+    Object.assign(st, s); if (st.modo === 'prueba' && !st.prueba) st.modo = 'idioma';
+    if (vista() === 'estudio') { pinta(); window.scrollTo(0, 0); }
+  });
   const ejecuta = (codigo, entradas) => { try { return M.correr(G.prepara(codigo, st.lang, D), st.lang, entradas); } catch (e) { return { salida: '', error: { message: String(e.message || e), linea: 0 } }; } };
   const cabecera = (titulo, sub) => h('div', { class: 'entre' }, h('div', { class: 'fila' }, st.modo !== 'idioma' ? h('button', { class: 'btn plano', onclick: () => ir_('idioma') }, `← Guía de ${guia().nombre}`) : h('button', { class: 'btn plano', onclick: () => ir_('inicio', { lang: null }) }, '← Elegir lenguaje')), h('span', { class: 'insignia' }, 'Sin puntos: aquí se estudia'));
 
@@ -30,7 +42,7 @@ raiz.VistaEstudio = function (ctx) {
   function vistaCapitulo() {
     const g = guia(), c = g.capitulos[st.cap], tareas = c.practica ? W.tareas.filter(t => t.tema === c.practica) : [];
     marcaLeido(c.id);
-    return h('div', { class: 'columna' }, cabecera(),
+    return h('div', { class: 'columna' }, cabecera(), navCapitulos(g),
       h('section', { class: 'tarjeta' }, h('span', { class: 'etiqueta' }, `${g.nombre} · capítulo ${st.cap + 1} de ${g.capitulos.length}`), h('h1', null, c.titulo), h('p', { class: 'objetivo' }, h('b', null, 'Al terminar sabrás: '), c.objetivo)),
       ...c.secciones.map(s => h('section', { class: 'tarjeta' }, h('h2', null, s.t), ...s.p.map(x => h('p', null, x)), s.ej ? ejemplo(s.ej) : null)),
       c.palabras.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Las palabras de este capítulo'),
@@ -40,8 +52,17 @@ raiz.VistaEstudio = function (ctx) {
       tareas.length ? h('section', { class: 'tarjeta' }, h('h2', null, 'Practica escribiendo (sin puntos)'), h('p', { class: 'tenue' }, 'Escríbelo tú. Se comprueba ejecutándolo; aquí no se gana ni se pierde nada, y puedes ver la solución cuando quieras.'), ...tareas.map(practica)) : null,
       c.id === 'errores' ? h('section', { class: 'tarjeta' }, h('h2', null, 'Chuleta'), chuleta()) : null,
       h('div', { class: 'entre' },
-        st.cap > 0 ? h('button', { class: 'btn', onclick: () => ir_('capitulo', { cap: st.cap - 1 }) }, `← ${g.capitulos[st.cap - 1].titulo}`) : h('span'),
+        st.cap > 0 ? h('button', { class: 'btn', onclick: () => ir_('capitulo', { cap: st.cap - 1 }) }, `← Anterior: ${g.capitulos[st.cap - 1].titulo}`) : h('span'),
         st.cap + 1 < g.capitulos.length ? h('button', { class: 'btn primario', onclick: () => ir_('capitulo', { cap: st.cap + 1 }) }, `${g.capitulos[st.cap + 1].titulo} →`) : h('button', { class: 'btn primario', onclick: () => empiezaPrueba() }, 'Ponte a prueba (sin puntos) →')));
+  }
+  /* Arriba de cada capítulo: anterior, ir a cualquier capítulo y siguiente (sin bajar hasta el final) */
+  function navCapitulos(g) {
+    const n = g.capitulos.length;
+    return h('nav', { class: 'nav-capitulos', 'aria-label': 'Moverse entre capítulos' },
+      h('button', { class: 'btn chico', id: 'cap-anterior', disabled: st.cap === 0, onclick: () => ir_('capitulo', { cap: st.cap - 1 }) }, '← Anterior'),
+      h('select', { class: 'campo', id: 'cap-ir', 'aria-label': 'Ir al capítulo', onchange: e => ir_('capitulo', { cap: Number(e.target.value) }) },
+        ...g.capitulos.map((c, k) => h('option', { value: String(k), selected: k === st.cap }, `${k + 1}. ${c.titulo}`))),
+      h('button', { class: 'btn chico', id: 'cap-siguiente', disabled: st.cap + 1 >= n, onclick: () => ir_('capitulo', { cap: st.cap + 1 }) }, 'Siguiente →'));
   }
   function practica(t) {
     const p = st.practica[t.id] || (st.practica[t.id] = { codigo: '', res: null, sol: false });

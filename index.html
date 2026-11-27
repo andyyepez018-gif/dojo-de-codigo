@@ -98,6 +98,15 @@ a { color: var(--ai); }
 .insignia.bien { background: var(--bien-suave); color: var(--bien); }
 .insignia.ai { background: var(--ai-suave); color: var(--ai-fuerte); }
 .insignia.kihada { background: var(--kihada-suave); color: var(--kihada); }
+.nav-capitulos { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
+.nav-capitulos select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+@media (max-width: 560px) {
+  .nav-capitulos { grid-template-columns: 1fr 1fr; }
+  .nav-capitulos select { grid-column: 1 / -1; grid-row: 1; }
+  .nav-capitulos #cap-siguiente { justify-self: end; }
+  .nav-capitulos #cap-anterior { justify-self: start; }
+}
+.nav-capitulos .btn[disabled] { opacity: .45; cursor: default; }
 select.campo, input.campo, textarea.campo { border: 1px solid var(--linea); background: var(--superficie); border-radius: 8px; padding: 8px 10px; max-width: 100%; }
 .barra { height: 8px; border-radius: 99px; background: var(--hundido); overflow: hidden; }
 .barra > i { display: block; height: 100%; background: var(--ai); border-radius: 99px; transition: width .4s ease; }
