@@ -51,6 +51,11 @@ const srv = http.createServer((q, r) => {
   await p.locator('#chat-personal .sugerencias .chip').first().click(); await p.waitForTimeout(400);
   ok('las preguntas rápidas también preguntan, y la conversación sigue (2 respuestas)', await p.locator('#chat-personal .burbuja.ella').count() === 2 && await p.evaluate(() => Array.isArray(window.__pregunta) && window.__pregunta.length === 3 && window.__pregunta[1].role === 'assistant'));
   ok('cada parte tiene «Explícamelo con Claude»', await p.locator('.seccion-personal').getByRole('button', { name: 'Explícamelo con Claude' }).count() === 7);
+  // Cómo armar un programa: «Ayúdame con este paso» pregunta a Claude con el ejercicio y el paso
+  await p.locator('#menu-lateral a[href="#estudio"]').click(); await p.getByRole('button', { name: '← Elegir lenguaje' }).click(); await p.waitForSelector('#armar-inicio'); await p.locator('#armar-inicio').getByRole('button', { name: 'C++', exact: true }).click();
+  await p.locator('#armar-practica .capitulo').first().click(); await p.waitForSelector('#guiado-paso-1');
+  await p.locator('#guiado-paso-1').getByRole('button', { name: 'Ayúdame con este paso' }).click(); await p.waitForTimeout(300);
+  ok('el guiado pide ayuda a Claude con el ejercicio, el lenguaje y el paso', /Explicación de prueba/.test(await p.textContent('#guiado-paso-1 .tutor')) && await p.evaluate(() => /Promedio|promedio/.test(window.__pregunta) && /C\+\+/.test(window.__pregunta) && /paso: 1/.test(window.__pregunta)));
   await p.goto('http://localhost:8771/#plan');
   ok('el plan enlaza a la app instalable', await p.locator('a[href="https://andyyepez018-gif.github.io/dojo-de-codigo/"]').count() === 1);
   ok('sin errores de JavaScript', errores.length === 0, errores);

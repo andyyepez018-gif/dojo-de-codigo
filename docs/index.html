@@ -128,7 +128,21 @@ a { color: var(--ai); }
 .requisitos li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .requisitos li .pila { gap: 1px; }
 .requisitos li.si b { color: var(--bien); } .requisitos li.no b { color: var(--mal); }
-.personal-acceso { border-color: var(--ai); }
+.personal-acceso, .armar-acceso { border-color: var(--ai); }
+.metodo-armar { display: grid; gap: 10px; padding-left: 22px; margin: 0; }
+.metodo-armar > li { display: grid; gap: 4px; }
+.receta-armada { display: grid; gap: 6px; padding-left: 22px; margin: 0; }
+.receta-armada.mal li { color: var(--mal); }
+.piezas-elegir li { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; }
+.piezas-elegir select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.piezas-elegir li.mal span { color: var(--mal); }
+.pieza-armar { border-top: 1px solid var(--linea); padding-top: 12px; display: grid; gap: 6px; }
+.pasos-guiado { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pasos-guiado li { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px 4px 4px; border-radius: 99px; background: var(--hundido); color: var(--tinta-2); }
+.pasos-guiado li .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--superficie); font-weight: 700; font-size: 12px; }
+.pasos-guiado li.actual { background: var(--ai-suave); color: var(--tinta); font-weight: 600; }
+.pasos-guiado li.hecho { background: var(--bien-suave); color: var(--bien); }
+.paso-guiado.hecho { opacity: .85; }
 .metas-personal { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
 .meta-personal { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--hundido); }
 .indice-personal { margin: 4px 0 0; padding-left: 0; list-style: none; display: grid; gap: 2px; }
@@ -579,6 +593,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="escribir.js"></script>
 <script src="estudio.js"></script>
 <script src="personalizado.js"></script>
+<script src="armar.js"></script>
 <script src="ingles.js"></script>
 <script src="habla.js"></script>
 <script src="nucleo.js"></script>

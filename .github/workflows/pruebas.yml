@@ -27,6 +27,8 @@ jobs:
         run: node pruebas/escribir.test.js
       - name: Guías de estudio (cada ejemplo se ejecuta)
         run: node pruebas/estudio.test.js
+      - name: Cómo armar un programa (3 lenguajes)
+        run: node pruebas/armar.test.js
       - name: Inglés (contenido, comparadores y miles de ejercicios generados)
         run: node pruebas/ingles.test.js
       - name: Habla de programador (términos y situaciones)

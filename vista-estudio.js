@@ -6,14 +6,14 @@
 raiz.VistaEstudio = function (ctx) {
   const { D, G, W, M, U, ir, aviso, abrirLab, vista } = ctx;
   const { $, h, ls, NL, bloqueCodigo, salidaBloque } = U;
-  const st = { lang: ls.get('estudio-lang', null), modo: 'inicio', cap: 0, busca: '', prueba: null, practica: {}, personal: null, chat: {} };
-  const Pz = ctx.Personalizado || raiz.Personalizado;
+  const st = { lang: ls.get('estudio-lang', null), modo: 'inicio', cap: 0, busca: '', prueba: null, practica: {}, personal: null, chat: {}, guiado: null, guias: {} };
+  const Pz = ctx.Personalizado || raiz.Personalizado, Ar = ctx.Armar || raiz.Armar;
   const guia = () => G.guias[st.lang];
   const leidos = () => ls.get('estudio-leidos-' + st.lang, {});
   const marcaLeido = id => { const x = leidos(); if (!x[id]) { x[id] = true; ls.set('estudio-leidos-' + st.lang, x); } };
   /* Cada cambio de pantalla dentro de la guía queda en el historial: el botón «atrás» del móvil o del
      navegador vuelve al capítulo (o a la pantalla) de antes en vez de salir de la sección. */
-  const foto = () => ({ modo: st.modo, cap: st.cap, lang: st.lang, personal: st.personal });
+  const foto = () => ({ modo: st.modo, cap: st.cap, lang: st.lang, personal: st.personal, guiado: st.guiado });
   const ir_ = (modo, extra) => {
     try { if (!(history.state && history.state.estudio)) history.replaceState({ estudio: foto() }, '', location.hash || '#estudio'); } catch (e) { /* sin historial */ }
     Object.assign(st, { modo }, extra || {}); pinta(); window.scrollTo(0, 0);
@@ -25,7 +25,7 @@ raiz.VistaEstudio = function (ctx) {
     if (vista() === 'estudio') { pinta(); window.scrollTo(0, 0); }
   });
   const ejecuta = (codigo, entradas) => { try { return M.correr(G.prepara(codigo, st.lang, D), st.lang, entradas); } catch (e) { return { salida: '', error: { message: String(e.message || e), linea: 0 } }; } };
-  const cabecera = (titulo, sub) => h('div', { class: 'entre' }, h('div', { class: 'fila' }, st.modo === 'personal' ? h('button', { class: 'btn plano', onclick: () => ir_('inicio') }, '← Estudio') : st.modo !== 'idioma' ? h('button', { class: 'btn plano', onclick: () => ir_('idioma') }, `← Guía de ${guia().nombre}`) : h('button', { class: 'btn plano', onclick: () => ir_('inicio', { lang: null }) }, '← Elegir lenguaje')), h('span', { class: 'insignia' }, 'Sin puntos: aquí se estudia'));
+  const cabecera = (titulo, sub) => h('div', { class: 'entre' }, h('div', { class: 'fila' }, st.modo === 'personal' ? h('button', { class: 'btn plano', onclick: () => ir_('inicio') }, '← Estudio') : st.modo === 'guiado' ? h('button', { class: 'btn plano', onclick: () => ir_('armar') }, '← Cómo armar un programa') : st.modo !== 'idioma' ? h('button', { class: 'btn plano', onclick: () => ir_('idioma') }, `← Guía de ${guia().nombre}`) : h('button', { class: 'btn plano', onclick: () => ir_('inicio', { lang: null }) }, '← Elegir lenguaje')), h('span', { class: 'insignia' }, 'Sin puntos: aquí se estudia'));
 
   /* ── Un ejemplo que se puede ejecutar aquí mismo ── */
   function ejemplo(ej) {
@@ -98,6 +98,114 @@ raiz.VistaEstudio = function (ctx) {
         h('span', { class: 'etiqueta' }, 'Pruebas con datos (se buscan estas palabras o números en lo que muestra, en este orden)'), U.listaPruebas(r.resultados),
         op.tutor && ctx.botonTutor ? ctx.botonTutor(r.ok ? 'Que Claude revise mi programa' : 'Que Claude me ayude a arreglarlo', () => `${REGLAS_PROFE}\n\nEjercicio: ${ej.enunciado}\n\nEl programa del alumno:\n${p.codigo}\n\nRúbrica (${r.puntos}/5): ${r.rubrica.map(x => (x.ok ? 'cumple ' : 'NO cumple ') + x.que + ' (' + x.nota + ')').join('; ')}.\nPruebas: ${r.resultados.map(x => 'con ' + x.entradas.join(', ') + (x.ok ? ' bien' : ' mal: ' + (x.error ? 'error ' + x.error.message : 'mostró ' + JSON.stringify(x.salida)))).join('; ')}.\n\n${r.ok ? 'Funciona. Dile en 3 frases qué hizo bien y una cosa que podría escribir más clara.' : 'Explícale en 3 a 6 frases qué falla y cómo pensarlo, señalando la línea. No le des el programa entero: guíalo.'}`) : null) : null,
       p.sol ? bloqueCodigo(ej.sol, 'ps') : null);
+  }
+
+  /* ═══════ Cómo armar un programa: el método (6 pasos), las piezas y programas guiados ═══════ */
+  const hechosArmar = () => ls.get('armar-hechos-' + st.lang, {}) || {};
+  const nombrePieza = id => (Ar.pieza(id) || {}).nombre || id;
+  function accesoArmar() {
+    if (!Ar) return null;
+    return h('section', { class: 'tarjeta', id: 'armar-inicio' }, h('span', { class: 'etiqueta' }, 'Cómo armar un programa'), h('h2', null, '¿Sabes las instrucciones pero te quedas en blanco?'),
+      h('p', { class: 'tenue' }, 'El método para pasar de un enunciado a un programa completo, las piezas que se repiten en casi todos los ejercicios y programas guiados paso a paso. En el lenguaje que quieras.'),
+      h('div', { class: 'fila' }, ...G.LANGS.map(l => h('button', { class: 'btn', onclick: () => { st.lang = l; ls.set('estudio-lang', l); ir_('armar'); } }, NL[l]))));
+  }
+  function vistaArmar() {
+    const l = st.lang, hechos = hechosArmar(), g = Ar.porId('promedio'), n = Ar.GUIADOS.filter(x => hechos[x.id]).length;
+    const ve = id => { const x = document.getElementById(id); if (x) x.scrollIntoView({ block: 'start' }); };
+    return h('div', { class: 'columna' }, cabecera(),
+      h('section', { class: 'tarjeta portada-estudio' }, h('span', { class: 'etiqueta' }, `Cómo armar un programa · ${NL[l]}`), h('h1', null, 'De un enunciado a un programa completo'),
+        h('p', null, `Saber Escribir, Leer, Si o Para es saber las palabras. Armar un programa es hacer frases con ellas, y para eso hay un método: siempre los mismos seis pasos. Nadie escribe un programa entero de golpe: se piensa, se descompone y se arma pieza a pieza.`),
+        h('div', { class: 'fila' }, h('span', { class: 'insignia num' + (n === Ar.GUIADOS.length ? ' bien' : '') }, `${n} de ${Ar.GUIADOS.length} programas armados`), h('span', { class: 'insignia' }, 'Sin puntos: aquí se aprende')),
+        h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ve('armar-metodo') }, 'El método'), h('button', { class: 'btn', onclick: () => ve('armar-piezas') }, 'Las piezas'), h('button', { class: 'btn', onclick: () => ve('armar-practica') }, 'Practicar'))),
+      h('section', { class: 'tarjeta', id: 'armar-metodo' }, h('h2', null, 'El método en 6 pasos'),
+        h('ol', { class: 'metodo-armar' }, ...Ar.METODO.map(m => h('li', null, h('b', null, m.t), h('span', null, m.p))))),
+      h('section', { class: 'tarjeta', id: 'armar-ejemplo' }, h('h2', null, `Un ejemplo completo: ${g.titulo.toLowerCase()}`), h('p', { class: 'enunciado' }, g.enunciado),
+        h('ol', { class: 'metodo-armar' },
+          h('li', null, h('b', null, 'Qué entra y qué sale'), h('span', null, `Entra: ${g.entra[0].toLowerCase()}. Sale: ${g.sale[0].toLowerCase()}.`)),
+          h('li', null, h('b', null, 'A mano'), h('span', null, `${g.aMano.datos}. ${g.aMano.explica}`)),
+          h('li', null, h('b', null, 'La receta'), h('ol', { class: 'receta-armada' }, ...g.receta.map(r => h('li', null, r[0])))),
+          h('li', null, h('b', null, 'Las piezas'), h('ul', { class: 'lista' }, ...g.receta.map(r => h('li', null, `${r[0]} → `, h('b', null, nombrePieza(r[2][0])))))),
+          h('li', null, h('b', null, 'Traducido, con la receta como comentarios'), ejemplo({ codigo: g.sol[l], nota: 'Cada comentario es un paso de la receta, y debajo va su código.', entradas: g.pruebas[0].entradas })),
+          h('li', null, h('b', null, 'Probado'), h('span', null, `Con los datos de a mano (${g.aMano.datos.toLowerCase()}) muestra ${g.aMano.respuesta}, lo mismo que en papel. Pulsa «▶ Ejecutar» y compruébalo.`)))),
+      h('section', { class: 'tarjeta', id: 'armar-piezas' }, h('h2', null, 'Las piezas que más se repiten'), h('p', { class: 'tenue' }, 'Casi todos los ejercicios de clase se arman combinando estas seis. Cuando leas un enunciado, busca cuáles necesitas.'),
+        ...Ar.PIEZAS.map(p => h('div', { class: 'pieza-armar', id: 'pieza-' + p.id }, h('h3', null, p.nombre), h('p', null, h('b', null, 'Para qué: '), p.para), h('p', { class: 'clave-personal' }, h('b', null, 'Cómo: '), p.como),
+          ejemplo({ codigo: p.codigo[l], nota: '', entradas: p.entradas })))),
+      h('section', { class: 'tarjeta', id: 'armar-practica' }, h('h2', null, 'Practica el método: programas guiados'),
+        h('p', { class: 'tenue' }, 'En cada uno, la app te lleva paso a paso: qué entra y qué sale, hacerlo a mano, ordenar la receta, reconocer las piezas y escribirlo. Se corrige solo, y Claude te ayuda en cualquier paso.'),
+        h('ol', { class: 'capitulos' }, ...Ar.GUIADOS.map((x, k) => h('li', null, h('button', { class: 'capitulo' + (hechos[x.id] ? ' leido' : ''), onclick: () => ir_('guiado', { guiado: x.id }) },
+          h('span', { class: 'n', 'aria-hidden': 'true' }, hechos[x.id] ? '✓' : String(k + 1)), h('span', { class: 'pila', style: 'gap:2px' }, h('b', null, x.titulo), h('span', { class: 'tenue' }, 'Piezas: ' + x.piezas.map(nombrePieza).join(' · ')))))))));
+  }
+  const mezcla = (n, semilla) => { const a = [...Array(n).keys()]; let s = semilla; for (let k = n - 1; k > 0; k--) { s = (s * 1103515245 + 12345) >>> 0; const j = s % (k + 1); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  function vistaGuiado() {
+    const g = Ar.porId(st.guiado), l = st.lang; if (!g) { st.modo = 'armar'; return vistaArmar(); }
+    const clave = l + '|' + g.id, sm = [...g.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const s = st.guias[clave] || (st.guias[clave] = { paso: 1, entra: null, sale: null, mano: '', manoFallos: 0, orden: [], ordenMal: false, piezas: {}, piezasMal: false, codigo: ls.get('armar-codigo-' + clave, '') || '', res: null, sol: false, ordenEntra: mezcla(g.entra.length, sm), ordenSale: mezcla(g.sale.length, sm + 7), desorden: Ar.desordena(g) });
+    const re = () => pinta(), avanza = p => { s.paso = Math.max(s.paso, p); pinta(); };
+    const ayuda = (que, detalle) => ctx.botonTutor ? ctx.botonTutor('Ayúdame con este paso', () => `${l === 'ps' ? REGLAS_PROFE : REGLAS_PROFE.replace('PSeInt desde cero', NL[l] + ' desde cero').replace(/Usa la sintaxis exacta de PSeInt[^.]*\. En PSeInt[^.]*\./, `Usa la sintaxis exacta de ${NL[l]}, la de un primer curso.`)}\n\nEl alumno está aprendiendo a armar programas con un método de 6 pasos: 1) qué entra y qué sale, 2) hacerlo a mano, 3) escribir la receta en español, 4) reconocer las piezas (repetir N veces, acumulador, contador, decidir con cada dato, el mayor, repetir hasta una señal), 5) traducir paso a paso, 6) probar.\nEjercicio: ${g.enunciado}\nLenguaje: ${NL[l]}\nEstá en el paso: ${que}.\n${detalle || ''}\nAyúdale con ESTE paso, sin resolverle los siguientes. 3 a 6 frases.`) : null;
+    const hecho = s.paso > 5 && s.res && s.res.ok;
+    const pasos = ['Qué entra y sale', 'A mano', 'La receta', 'Las piezas', 'Escribirlo', 'Probarlo'];
+    const cabeza = h('section', { class: 'tarjeta portada-estudio' }, h('span', { class: 'etiqueta' }, `Programa guiado · ${NL[l]}`), h('h1', null, g.titulo), h('p', { class: 'enunciado es-grande' }, g.enunciado),
+      h('ol', { class: 'pasos-guiado', 'aria-label': 'Pasos del método' }, ...pasos.map((t, k) => h('li', { class: (s.paso > k + 1 || (k === 5 && hecho)) ? 'hecho' : s.paso === k + 1 || (k === 5 && s.paso === 5) ? 'actual' : '' }, h('span', { class: 'n' }, (s.paso > k + 1 || (k === 5 && hecho)) ? '✓' : String(k + 1)), t))));
+    const tarjeta = (n, titulo, ...hijos) => h('section', { class: 'tarjeta paso-guiado' + (s.paso > n ? ' hecho' : ''), id: 'guiado-paso-' + n }, h('span', { class: 'etiqueta' }, `Paso ${n} de 6`), h('h2', null, (s.paso > n ? '✓ ' : '') + titulo), ...hijos);
+    const opcionesDe = (lista, orden, campo) => h('div', { class: 'opciones una', role: 'group', 'aria-label': 'Opciones' }, ...orden.map(k => h('button', { class: 'opcion', 'aria-pressed': String(s[campo] === k), disabled: s.paso > 1 || null, onclick: () => { s[campo] = k; re(); } }, h('span', { class: 'texto-opcion' }, lista[k]))));
+    const bloques = [cabeza];
+    // 1. Qué entra y qué sale
+    bloques.push(tarjeta(1, '¿Qué entra y qué sale?', h('p', null, h('b', null, '¿Qué datos entran (los que pide o recibe el programa)?')), opcionesDe(g.entra, s.ordenEntra, 'entra'),
+      h('p', null, h('b', null, '¿Qué tiene que mostrar al final?')), opcionesDe(g.sale, s.ordenSale, 'sale'),
+      s.paso === 1 ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'guiado-1-ok', onclick: () => { if (s.entra === null || s.sale === null) { aviso('Elige una respuesta en las dos preguntas.'); return; } if (s.entra === 0 && s.sale === 0) avanza(2); else aviso('Todavía no. Relee el enunciado: ¿qué te dice que pidas? ¿Qué te dice que muestres?', 5000); } }, 'Comprobar')) : null,
+      s.paso === 1 ? ayuda('1, qué entra y qué sale', `Ha marcado: entra «${s.entra === null ? 'nada' : g.entra[s.entra]}», sale «${s.sale === null ? 'nada' : g.sale[s.sale]}».`) : null));
+    // 2. A mano
+    if (s.paso >= 2) {
+      const campo = h('input', { class: 'campo', id: 'guiado-mano', type: 'text', inputmode: 'decimal', autocomplete: 'off', 'aria-label': g.aMano.pregunta, disabled: s.paso > 2 || null });
+      campo.value = s.mano; campo.addEventListener('input', () => { s.mano = campo.value; });
+      const comprobar = () => { s.mano = campo.value; if (Ar.aManoBien(g, s.mano)) avanza(3); else { s.manoFallos++; re(); aviso('No da eso. Hazlo despacio, con papel, paso a paso.', 4000); } };
+      campo.addEventListener('keydown', e => { if (e.key === 'Enter') comprobar(); });
+      bloques.push(tarjeta(2, 'Hazlo tú a mano', h('p', null, 'Con estos datos: ', h('b', null, g.aMano.datos)), h('label', { class: 'ajuste', for: 'guiado-mano' }, h('span', null, g.aMano.pregunta), campo),
+        s.paso === 2 ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'guiado-2-ok', onclick: comprobar }, 'Comprobar'), s.manoFallos >= 2 ? h('button', { class: 'btn plano', onclick: () => { s.mano = String(g.aMano.respuesta); avanza(3); } }, 'Ver la respuesta') : null) : null,
+        s.paso > 2 ? h('p', { class: 'clave-personal' }, h('b', null, `Da ${g.aMano.respuesta}. `), g.aMano.explica) : ayuda('2, resolverlo a mano', `Datos: ${g.aMano.datos}. Pregunta: ${g.aMano.pregunta}. Su respuesta: «${s.mano}». No le digas el número: explícale cómo hacerlo a mano.`)));
+    }
+    // 3. La receta
+    if (s.paso >= 3) {
+      const usados = new Set(s.orden), listo = s.orden.length === g.receta.length;
+      bloques.push(tarjeta(3, 'Escribe la receta en español', h('p', { class: 'tenue' }, 'Estos son los pasos, desordenados. Tócalos en el orden en que los haría el programa.'),
+        s.paso === 3 ? h('div', { class: 'opciones una', role: 'group', 'aria-label': 'Pasos sin ordenar' }, ...s.desorden.filter(k => !usados.has(k)).map(k => h('button', { class: 'opcion', onclick: () => { s.orden.push(k); s.ordenMal = false; re(); } }, h('span', { class: 'texto-opcion' }, g.receta[k][0])))) : null,
+        h('span', { class: 'etiqueta' }, 'Tu receta'), s.orden.length ? h('ol', { class: 'receta-armada' + (s.ordenMal ? ' mal' : '') }, ...s.orden.map(k => h('li', null, g.receta[k][0]))) : h('p', { class: 'tenue' }, 'Todavía vacía: toca el primer paso.'),
+        s.paso === 3 ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'guiado-3-ok', disabled: !listo || null, onclick: () => { if (Ar.recetaBien(g, s.orden)) avanza(4); else { s.ordenMal = true; re(); aviso('Ese orden no funciona: ¿qué tiene que existir antes de poder hacer cada paso?', 5000); } } }, 'Comprobar'),
+          s.orden.length ? h('button', { class: 'btn plano', onclick: () => { s.orden.pop(); s.ordenMal = false; re(); } }, 'Quitar el último') : null) : null,
+        s.paso === 3 ? ayuda('3, ordenar la receta', `Su orden: ${s.orden.map(k => g.receta[k][0]).join(' → ') || '(vacío)'}. Pasos disponibles: ${g.receta.map(r => r[0]).join(' | ')}.`) : null));
+    }
+    // 4. Las piezas
+    if (s.paso >= 4) {
+      const opciones = [Ar.SUELTA, ...Ar.PIEZAS];
+      bloques.push(tarjeta(4, 'Reconoce las piezas', h('p', { class: 'tenue' }, '¿Qué pieza es cada paso? (Las piezas están explicadas en «Cómo armar un programa».)'),
+        h('ol', { class: 'receta-armada piezas-elegir' }, ...s.orden.map(k => {
+          const sel = h('select', { class: 'campo', id: 'guiado-pieza-' + k, 'aria-label': 'Pieza del paso: ' + g.receta[k][0], disabled: s.paso > 4 || null, onchange: e => { s.piezas[k] = e.target.value; s.piezasMal = false; } },
+            h('option', { value: '' }, 'Elige la pieza…'), ...opciones.map(o => h('option', { value: o.id }, o.nombre)));
+          sel.value = s.piezas[k] || '';
+          const mal = s.piezasMal && !Ar.piezaBien(g, k, s.piezas[k]);
+          return h('li', { class: mal ? 'mal' : '' }, h('span', null, g.receta[k][0]), sel, s.paso > 4 || mal ? h('small', { class: 'tenue' }, mal ? '✗ Esta no. ' + (Ar.pieza(g.receta[k][2][0]) || {}).para : '✓') : null);
+        })),
+        s.paso === 4 ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'guiado-4-ok', onclick: () => { if (s.orden.every(k => Ar.piezaBien(g, k, s.piezas[k]))) avanza(5); else { s.piezasMal = true; re(); } } }, 'Comprobar')) : null,
+        s.paso === 4 ? ayuda('4, reconocer las piezas', `Su elección: ${s.orden.map(k => g.receta[k][0] + ' = ' + (s.piezas[k] ? nombrePieza(s.piezas[k]) : '¿?')).join('; ')}.`) : null));
+    }
+    // 5 y 6. Escribirlo y probarlo
+    if (s.paso >= 5) {
+      const comprueba = () => { if (!s.codigo.trim()) { aviso('Escribe tu programa primero.'); return; } s.res = W.corrige(s.codigo, l, g.pruebas, D); if (s.res.ok) { const x = hechosArmar(); x[g.id] = true; ls.set('armar-hechos-' + l, x); } s.paso = 6; re(); };
+      const pon = () => { s.codigo = Ar.esqueleto(g, l, s.orden); ls.set('armar-codigo-' + clave, s.codigo); re(); };
+      const sig = Ar.GUIADOS[Ar.GUIADOS.indexOf(g) + 1];
+      bloques.push(tarjeta(5, 'Tradúcelo paso a paso y pruébalo',
+        h('p', null, 'Empieza poniendo la receta como comentarios: debajo de cada uno, escribe el código de ese paso. Ve de uno en uno.'),
+        h('div', { class: 'fila' }, h('button', { class: 'btn', id: 'guiado-esqueleto', onclick: pon }, s.codigo.trim() ? 'Volver a empezar con la receta como comentarios' : 'Poner la receta como comentarios')),
+        U.hojaPapel({ id: 'guiado-hoja', etiqueta: `Tu programa en ${NL[l]}`, lang: l, valor: s.codigo, filas: 14, alCambiar: v => { s.codigo = v; ls.set('armar-codigo-' + clave, v); }, alComprobar: comprueba }),
+        h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'guiado-comprobar', onclick: comprueba }, 'Probarlo'),
+          h('button', { class: 'btn plano', onclick: () => abrirLab({ lang: l, codigo: W.prepara(s.codigo || g.sol[l], l, D), entradas: g.pruebas[0].entradas, traza: true }) }, 'Ver paso a paso'),
+          h('button', { class: 'btn plano', onclick: () => { s.sol = !s.sol; re(); } }, s.sol ? 'Ocultar la solución' : 'Ver una solución')),
+        s.res ? h('div', { class: 'respuesta ' + (s.res.ok ? 'si' : 'no'), role: 'status' }, h('h3', null, s.res.ok ? '¡Armado! Lo escribiste tú con el método' : 'Todavía no: mira qué muestra con cada dato'), U.listaPruebas(s.res.resultados),
+          s.res.ok && sig ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ir_('guiado', { guiado: sig.id }) }, `Siguiente: ${sig.titulo} →`)) : null) : null,
+        s.sol ? bloqueCodigo(g.sol[l], l) : null,
+        ayuda('5 y 6, escribir el código y probarlo', `Su receta: ${s.orden.map(k => g.receta[k][0]).join(' → ')}.\nSu programa:\n${s.codigo || '(vacío)'}\n${s.res ? 'Resultado de las pruebas: ' + s.res.resultados.map(x => (x.ok ? 'bien' : 'mal') + ' con ' + x.entradas.join(', ') + (x.ok ? '' : ': ' + (x.error ? 'error ' + x.error.message : 'mostró ' + JSON.stringify(x.salida)))).join('; ') : ''}\nSeñala el paso de la receta que falla y cómo traducirlo; no le des el programa entero.`)));
+    }
+    return h('div', { class: 'columna' }, cabecera(), ...bloques);
   }
 
   /* ═══════ Capítulo personalizado: hecho con el material de clase, con Claude de profesor ═══════ */
@@ -309,6 +417,7 @@ raiz.VistaEstudio = function (ctx) {
         h('div', { class: 'fila' }, h('button', { class: 'btn primario grande', onclick: () => ir_('capitulo', { cap: Math.max(0, g.capitulos.findIndex(c => !l[c.id])) }) }, hechos ? 'Seguir leyendo' : 'Empezar desde cero'),
           h('button', { class: 'btn', onclick: () => ir_('lab') }, 'Laboratorio libre'))),
       h('div', { class: 'accesos-estudio' },
+        Ar ? h('button', { class: 'tarjeta acceso armar-acceso', onclick: () => ir_('armar') }, h('b', null, 'Cómo armar un programa'), h('span', { class: 'tenue' }, 'El método para no quedarte en blanco')) : null,
         h('button', { class: 'tarjeta acceso', onclick: () => ir_('chuleta') }, h('b', null, 'Chuleta'), h('span', { class: 'tenue' }, 'Todo lo esencial en una pantalla')),
         h('button', { class: 'tarjeta acceso', onclick: () => ir_('diccionario', { busca: '' }) }, h('b', null, 'Diccionario'), h('span', { class: 'tenue' }, `${G.diccionario(st.lang).length} palabras explicadas`)),
         h('button', { class: 'tarjeta acceso', onclick: empiezaPrueba }, h('b', null, 'Ponte a prueba'), h('span', { class: 'tenue' }, '10 preguntas, sin puntos'))),
@@ -317,7 +426,7 @@ raiz.VistaEstudio = function (ctx) {
           h('span', { class: 'n', 'aria-hidden': 'true' }, l[c.id] ? '✓' : String(k + 1)), h('span', { class: 'pila', style: 'gap:2px' }, h('b', null, c.titulo), h('span', { class: 'tenue' }, c.objetivo))))))));
   }
   function vistaInicio() {
-    return h('div', { class: 'columna' }, accesoPersonales(),
+    return h('div', { class: 'columna' }, accesoPersonales(), accesoArmar(),
       h('section', { class: 'tarjeta portada-estudio' }, h('span', { class: 'etiqueta' }, 'Estudio intensivo'), h('h1', null, '¿Qué quieres estudiar a fondo?'),
         h('p', null, 'Una guía completa de cada lenguaje, desde cero, como si nunca lo hubieras visto: cada instrucción explicada, ejemplos que puedes ejecutar y cambiar, las palabras una a una, los errores típicos, una chuleta y un laboratorio libre. Ideal para la víspera de una evaluación.'),
         h('p', { class: 'tenue' }, 'Aquí no se ganan ni se pierden puntos, ni cuenta para el rango: es solo para aprender.')),
@@ -331,7 +440,7 @@ raiz.VistaEstudio = function (ctx) {
     el.textContent = '';
     if (st.modo === 'personal') { const c = Pz && Pz.porId(st.personal); if (c) st.lang = c.lang; else st.modo = 'inicio'; }
     if (!st.lang || !G.guias[st.lang]) st.modo = 'inicio';
-    el.append(st.modo === 'personal' ? vistaPersonal() : st.modo === 'capitulo' ? vistaCapitulo() : st.modo === 'chuleta' ? vistaChuleta() : st.modo === 'diccionario' ? vistaDiccionario() : st.modo === 'prueba' && st.prueba ? vistaPrueba() : st.modo === 'lab' ? vistaLab() : st.modo === 'idioma' ? vistaIdioma() : vistaInicio());
+    el.append(st.modo === 'personal' ? vistaPersonal() : st.modo === 'armar' && Ar ? vistaArmar() : st.modo === 'guiado' && Ar ? vistaGuiado() : st.modo === 'capitulo' ? vistaCapitulo() : st.modo === 'chuleta' ? vistaChuleta() : st.modo === 'diccionario' ? vistaDiccionario() : st.modo === 'prueba' && st.prueba ? vistaPrueba() : st.modo === 'lab' ? vistaLab() : st.modo === 'idioma' ? vistaIdioma() : vistaInicio());
     if (foco && document.getElementById(foco) && el.contains(document.getElementById(foco))) { const x = document.getElementById(foco); x.focus({ preventScroll: true }); if (x.type === 'search') x.setSelectionRange(x.value.length, x.value.length); }
   }
   return { pinta, inicio: () => { if (st.modo !== 'inicio') st.modo = st.lang ? 'idioma' : 'inicio'; }, abrePersonal: id => ir_('personal', { personal: id }), estado: st };

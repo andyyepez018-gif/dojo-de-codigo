@@ -562,7 +562,31 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.screenshot({ path: path.join(CAPTURAS, '32-capitulo-personalizado.png'), fullPage: false });
   await p.goBack(); await p.waitForSelector('#cap-ir');
   ok('atrás vuelve al capítulo 9 de la guía', await p.inputValue('#cap-ir') === '8');
-  await p.selectOption('#cap-ir', '0'); await p.waitForSelector('.objetivo');
+  // Cómo armar un programa: el método y un programa guiado, de principio a fin
+  { const A = require('../armar.js'), g = A.porId('mayor'), toca = async sel => { await p.locator(sel).evaluate(e => e.scrollIntoView({ block: 'center' })); await p.click(sel); };
+    await p.locator('#menu-lateral a[href="#estudio"]').click(); await p.getByRole('button', { name: '← Elegir lenguaje' }).click(); await p.waitForSelector('#armar-inicio'); await p.locator('#armar-inicio').getByRole('button', { name: 'Python', exact: true }).click(); await p.waitForSelector('#armar-metodo');
+    ok('«Cómo armar un programa»: método de 6 pasos, 6 piezas y 6 guiados', await p.locator('#armar-metodo li').count() === 6 && await p.locator('.pieza-armar').count() === 6 && await p.locator('#armar-practica .capitulo').count() === 6);
+    await p.locator('#armar-practica .capitulo').nth(2).click(); await p.waitForSelector('#guiado-paso-1');
+    await p.locator('#guiado-paso-1 .opcion', { hasText: g.entra[2] }).click(); await p.locator('#guiado-paso-1 .opcion', { hasText: g.sale[0] }).click(); await toca('#guiado-1-ok');
+    ok('guiado: con «qué entra» mal no se avanza', await p.locator('#guiado-paso-2').count() === 0);
+    await p.locator('#guiado-paso-1 .opcion', { hasText: g.entra[0] }).click(); await toca('#guiado-1-ok'); await p.waitForSelector('#guiado-paso-2');
+    await p.fill('#guiado-mano', '12'); await toca('#guiado-2-ok'); await p.waitForSelector('#guiado-paso-3');
+    for (const k of [0, 2, 1, 3, 4]) await p.locator('#guiado-paso-3 .opcion', { hasText: g.receta[k][0] }).click();
+    await toca('#guiado-3-ok');
+    ok('guiado: una receta en mal orden no vale', await p.locator('#guiado-paso-4').count() === 0 && await p.locator('#guiado-paso-3 .receta-armada.mal').count() === 1);
+    for (let k = 0; k < 5; k++) await p.locator('#guiado-paso-3').getByRole('button', { name: 'Quitar el último' }).click();
+    for (let k = 0; k < 5; k++) await p.locator('#guiado-paso-3 .opcion', { hasText: g.receta[k][0] }).click();
+    await toca('#guiado-3-ok'); await p.waitForSelector('#guiado-paso-4');
+    for (let k = 0; k < 5; k++) await p.selectOption('#guiado-pieza-' + k, g.receta[k][2][0]);
+    await toca('#guiado-4-ok'); await p.waitForSelector('#guiado-paso-5');
+    await toca('#guiado-esqueleto');
+    ok('guiado: «Poner la receta como comentarios» escribe la receta en el editor', /^# 1\. Preguntar cuántos números hay/.test(await p.inputValue('#guiado-hoja')), await p.inputValue('#guiado-hoja'));
+    await p.fill('#guiado-hoja', g.sol.py); await toca('#guiado-comprobar'); await p.waitForSelector('#guiado-paso-5 .respuesta');
+    ok('guiado: el programa se prueba solo y el método queda completo', /Armado/.test(await p.textContent('#guiado-paso-5 .respuesta')) && await p.locator('.pasos-guiado li.hecho').count() === 6);
+    await p.screenshot({ path: path.join(CAPTURAS, '33-armar-guiado.png'), fullPage: false });
+    await p.goBack(); await p.waitForSelector('#armar-practica');
+    ok('guiado: cuenta en el progreso', /1 de 6 programas armados/.test(await p.textContent('#v-estudio .portada-estudio'))); }
+  await p.locator('#menu-lateral a[href="#estudio"]').click(); await p.getByRole('button', { name: '← Elegir lenguaje' }).click(); await p.locator('.lenguaje-estudio', { hasText: 'PSeInt' }).click(); await p.waitForSelector('.capitulos'); await p.locator('.capitulo').first().click(); await p.waitForSelector('.objetivo');
   const t = W.tareas.find(x => x.tema === 'salida');
   await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
   ok('practicar escribiendo: se corrige', /Funciona/.test(await p.textContent('.practica-estudio')));

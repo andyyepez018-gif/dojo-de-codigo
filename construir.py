@@ -11,8 +11,8 @@ import hashlib, json, re, shutil, subprocess, sys, pathlib
 
 raiz = pathlib.Path(__file__).parent
 docs = raiz / 'docs'
-SCRIPTS = ['motor.js', 'contenido.js', 'escribir.js', 'estudio.js', 'personalizado.js', 'ingles.js', 'habla.js', 'nucleo.js', 'ui.js', 'ejecutor.js', 'trabajador.js', 'voz.js', 'vista-ingles.js', 'vista-habla.js', 'vista-estudio.js', 'vista-examen.js', 'app.js']
-PRUEBAS = ['motor', 'pseint', 'contenido', 'soluciones', 'escribir', 'estudio', 'ingles', 'habla', 'nucleo']
+SCRIPTS = ['motor.js', 'contenido.js', 'escribir.js', 'estudio.js', 'personalizado.js', 'armar.js', 'ingles.js', 'habla.js', 'nucleo.js', 'ui.js', 'ejecutor.js', 'trabajador.js', 'voz.js', 'vista-ingles.js', 'vista-habla.js', 'vista-estudio.js', 'vista-examen.js', 'app.js']
+PRUEBAS = ['motor', 'pseint', 'contenido', 'soluciones', 'escribir', 'estudio', 'armar', 'ingles', 'habla', 'nucleo']
 
 if '--sin-pruebas' not in sys.argv:
     for p in PRUEBAS:

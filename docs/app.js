@@ -1218,7 +1218,7 @@ function practicaRequisito(x) {
   } else if (x.area === 'ingles') { const e = N.estadoUnidad(P.d, I, x.id); if (e.retos && !e.conversa) VI.abrirUnidad(x.id); else VI.practicar(x.id); }
   else if (x.area === 'habla') VH.practicar(x.id);
 }
-const VS = window.VistaEstudio({ D, G: window.Estudio, W, M, U, ir, aviso, abrirLab, Personalizado: window.Personalizado, botonTutor, sample: sampleActivo, apagaTutor: () => { tutorApagado = true; }, vista: () => vista });
+const VS = window.VistaEstudio({ D, G: window.Estudio, W, M, U, ir, aviso, abrirLab, Personalizado: window.Personalizado, Armar: window.Armar, botonTutor, sample: sampleActivo, apagaTutor: () => { tutorApagado = true; }, vista: () => vista });
 PINTA.estudio = () => VS.pinta();
 const VH = window.VistaHabla({ P, N, J, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, vista: () => vista });
 PINTA.habla = () => VH.pinta();
