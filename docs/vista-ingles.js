@@ -231,7 +231,7 @@ raiz.VistaIngles = function (ctx) {
     c.log.push({ quien: 'yo', texto: alternativas[0] || r.oido, ok: bien }); c.ejemplo = false;
     if (bien) { c.bien++; avanza(); return; }
     c.intentos++;
-    const f = N.registraFallo(P.d, N.PUNTOS.conversaFallo); trataPuntos(f, false); c.log[c.log.length - 1].puntos = f.delta;
+    const f = N.registraFallo(P.d, N.PUNTOS.conversaFallo, 'ingles'); trataPuntos(f, false); c.log[c.log.length - 1].puntos = f.delta;
     if (c.intentos >= 2) { c.log.push({ quien: 'nota', texto: `Seguimos. Una forma de decirlo: «${t.ejemplo}»` }); avanza(); }
     else { c.log.push({ quien: 'nota', texto: `No te entendí del todo. ${t.es} Prueba otra vez.` }); PINTA(); }
   }

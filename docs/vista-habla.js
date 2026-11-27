@@ -127,7 +127,7 @@ raiz.VistaHabla = function (ctx) {
     else { st.modo = 'inicio'; el.append(vistaInicio()); }
     const s = $('#hab-siguiente'); if (st.modo === 'practica' && st.respondido && s) s.focus({ preventScroll: true });
   }
-  function practicar() { st.fijo = null; st.repaso = false; st.modo = 'practica'; if (vista() !== 'habla') ir('habla'); siguiente(); }
+  function practicar(bid) { st.fijo = bid && J.porId[bid] ? bid : null; st.repaso = false; st.modo = 'practica'; if (vista() !== 'habla') ir('habla'); siguiente(); }
   document.addEventListener('keydown', ev => {
     if (vista() !== 'habla' || st.modo !== 'practica' || !st.ej || ev.ctrlKey || ev.metaKey || ev.altKey || document.querySelector('.capa')) return;
     if (ev.target.closest && ev.target.closest('input, textarea, select')) return;

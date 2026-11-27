@@ -2,7 +2,7 @@
    No toca el DOM, así que se prueba igual en Node que en el navegador. */
 (function (raiz) {
 'use strict';
-const VERSION = '1.10.0';
+const VERSION = '1.11.0';
 const LANGS = ['ps', 'py', 'cpp'];
 const REGLA = 'Si le mando un mensaje a Claude, entonces abro el Dojo y hago retos hasta que me responda.';
 const INTERVALOS = [0, 1, 3, 7, 16, 35];   // días hasta el siguiente repaso según la caja (0 = fallado)
@@ -44,6 +44,51 @@ const PUNTOS = {
   completa: 12, escribe: 15, paso: 40, proyecto: 100   // escribir vale más que reconocer; cada paso del proyecto +40 y terminarlo +100
 };
 const PASOS_PROYECTO = 3;
+/* Puntos por partes: los puntos que separan un rango del siguiente se reparten entre código (40 %),
+   inglés (35 %) y habla de programador (25 %), lo mismo que pesa cada parte en el examen. Cada parte da
+   su porción y ahí se para: para llegar al examen hay que llenar las tres. d.tramo guarda lo que lleva cada
+   parte en el tramo actual (puede ser negativo si los fallos te bajan de rango). Siempre se cumple:
+   d.puntos = mínimo del rango aprobado + código + inglés + habla. En el último rango no hay tope. */
+const AREAS = ['codigo', 'ingles', 'habla'];
+const REPARTO = { codigo: 0.4, ingles: 0.35, habla: 0.25 };
+const NOMBRE_AREA = { codigo: 'Código', ingles: 'Inglés', habla: 'Habla de programador' };
+function topes(k) {
+  const G = RANGOS[k].min - RANGOS[k - 1].min, c = Math.round(G * REPARTO.codigo), i = Math.round(G * REPARTO.ingles);
+  return { codigo: c, ingles: i, habla: G - c - i };
+}
+/* Reparte n puntos entre las tres partes según el reparto, sin pasar de los topes */
+function reparte(n, T) {
+  const c = Math.round(n * REPARTO.codigo), i = Math.round(n * REPARTO.ingles), x = { codigo: c, ingles: i, habla: n - c - i };
+  if (T) for (const a of AREAS) x[a] = Math.min(x[a], T[a]);
+  return x;
+}
+/* El tramo hacia el rango siguiente; se crea o se repara si no cuadra con los puntos */
+function tramoDe(d) {
+  const k = d.rangoMax + 1; if (!RANGOS[k]) { d.tramo = null; return null; }
+  const base = RANGOS[k - 1].min, T = topes(k), t = d.tramo;
+  const ok = t && t.k === k && AREAS.every(a => Number.isFinite(t[a]) && t[a] <= T[a]) && base + AREAS.reduce((s, a) => s + t[a], 0) === d.puntos;
+  if (!ok) {
+    // progreso de antes de los topes (o datos que no cuadran): lo que pasa del rango aprobado se reparte entre las partes
+    const extra = Math.min(d.puntos - base, RANGOS[k].min - base), x = reparte(extra, T);
+    d.tramo = { k, codigo: x.codigo, ingles: x.ingles, habla: x.habla };
+    d.puntos = Math.max(0, base + AREAS.reduce((s, a) => s + d.tramo[a], 0));
+  }
+  return d.tramo;
+}
+/* Los puntos que el proyecto del rango tiene guardados dentro de la parte de código (para que siempre quepan) */
+function reservaProyecto(d, k) {
+  const hechos = d.proyectos[k] || 0; if (hechos >= PASOS_PROYECTO) return 0;
+  const pendiente = (PASOS_PROYECTO - hechos) * PUNTOS.paso + PUNTOS.proyecto;
+  return Math.min(pendiente, Math.round(topes(k).codigo / 2));
+}
+/* Cómo va cada parte en el tramo actual: { codigo: { tiene, tope, lleno }, … } */
+function estadoAreas(d) {
+  const t = tramoDe(d); if (!t) return null;
+  const T = topes(t.k), out = {};
+  for (const a of AREAS) out[a] = { tiene: t[a], tope: T[a], lleno: t[a] >= T[a], nombre: NOMBRE_AREA[a] };
+  out.codigo.reserva = reservaProyecto(d, t.k);   // lo que solo puede dar el proyecto
+  return out;
+}
 /* Suspender un examen resta el 10 % de los puntos de ese rango (al menos 50): hay que volver a ganarlos */
 const multaExamen = k => Math.max(50, Math.round(RANGOS[k].min * 0.1));
 
@@ -71,7 +116,8 @@ const ultimosLimpios = x => (Array.isArray(x) ? x : []).slice(-10).map(v => (v ?
    pegado o datos dañados). Lo que no se reconoce se descarta; nada puede romper la app.
    I (el curso de inglés) es opcional: sin él, el progreso de inglés se conserva solo si tiene buena forma. */
 function normaliza(d, D, I, J) {
-  const n = NUEVO(); if (!d || typeof d !== 'object' || Array.isArray(d)) return n;
+  if (D && I && J) CONT = { D, I, J };   // para comprobar lo que hay que dominar antes de cada examen
+  const n = NUEVO(); if (!d || typeof d !== 'object' || Array.isArray(d)) { tramoDe(n); return n; }
   const hoy = hoyClave();
   n.actualizado = entero(d.actualizado, 0, 1e15); n.puntos = entero(d.puntos);
   // rangoMax = el rango más alto aprobado. Quien venía de antes de los exámenes conserva el rango que ya tenía.
@@ -148,6 +194,9 @@ function normaliza(d, D, I, J) {
   if (pl.checks && typeof pl.checks === 'object') for (const k of Object.keys(pl.checks)) if (/^[a-z-]{1,30}$/.test(k) && pl.checks[k] === true) n.plan.checks[k] = true;
   if (typeof pl.regla === 'string' && pl.regla.trim()) n.plan.regla = pl.regla.slice(0, 500);
   n.bienvenida = d.bienvenida === true || Object.keys(n.dias).length > 0;
+  const tr = d.tramo && typeof d.tramo === 'object' ? d.tramo : null;
+  if (tr) n.tramo = { k: entero(tr.k, 0, RANGOS.length), codigo: Math.round(Number(tr.codigo)) || 0, ingles: Math.round(Number(tr.ingles)) || 0, habla: Math.round(Number(tr.habla)) || 0 };
+  tramoDe(n);   // repara el tramo si no cuadra con los puntos (o lo crea si el progreso es de antes)
   return n;
 }
 
@@ -182,27 +231,69 @@ function rangoActual(d) {
   return { i, n: i + 1, rango: r, siguiente: sig, faltan: sig ? Math.max(0, sig.min - d.puntos) : 0,
     prop: sig ? Math.max(0, Math.min(1, (d.puntos - r.min) / (sig.min - r.min))) : 1, examen: estadoExamen(d) };
 }
-/* El examen del rango siguiente: disponible cuando llegas a sus puntos (y, si lo suspendiste, tras practicar) */
+/* Lo que entra en el examen hay que dominarlo antes de hacerlo (no basta con los puntos). Necesita el
+   contenido (temas, unidades y bloques): normaliza lo recibe y lo recuerda; sin él no se comprueba. */
+let CONT = null;
+function requisitosDominio(d, k) {
+  if (!CONT || !RANGOS[k]) return [];
+  const E = RANGOS[k].examen, out = [], pct = x => Math.round(x * 100) + ' %';
+  for (const t of CONT.D.temas.slice(0, E.temas)) {
+    const e = estadoTema(d, CONT.D, t.id); if (e.dominado) continue;
+    const falta = [];
+    if (e.n < 8) falta.push(`${e.n} de 8 retos`); else if (e.prop < 0.8) falta.push(`aciertas el ${pct(e.prop)} de los últimos retos (hace falta el 80 %)`);
+    if (!e.ej) falta.push('falta un ejercicio de escribir');
+    out.push({ area: 'codigo', id: t.id, titulo: t.titulo, falta: falta.join(' · ') });
+  }
+  if (CONT.I) for (const u of CONT.I.unidades.slice(0, E.unidades)) {
+    const e = estadoUnidad(d, CONT.I, u.id); if (e.dominada) continue;
+    const falta = [];
+    if (e.n < 8) falta.push(`${e.n} de 8 ejercicios`); else if (e.prop < 0.8) falta.push(`aciertas el ${pct(e.prop)} (hace falta el 80 %)`);
+    if (!e.conversa) falta.push('falta la conversación de la unidad');
+    out.push({ area: 'ingles', id: u.id, titulo: u.titulo, falta: falta.join(' · ') });
+  }
+  if (CONT.J) for (const b of CONT.J.bloques.slice(0, E.bloques)) {
+    const e = estadoBloque(d, CONT.J, b.id); if (e.dominado) continue;
+    out.push({ area: 'habla', id: b.id, titulo: b.titulo, falta: e.n < 8 ? `${e.n} de 8 ejercicios` : `aciertas el ${pct(e.prop)} (hace falta el 80 %)` });
+  }
+  return out;
+}
+/* El examen del rango siguiente: disponible con los puntos de las tres partes, lo que entra dominado,
+   el proyecto hecho y, si lo suspendiste, el repaso terminado */
 function estadoExamen(d) {
   const k = d.rangoMax + 1, R = RANGOS[k];
   if (!R) return null;
   const objetivo = Math.max(R.min, d.examenes.reintento), puntosOk = d.puntos >= R.min, espera = Math.max(0, objetivo - d.puntos), repaso = d.examenes.repaso.length;
   const proyecto = d.proyectos[k] || 0, proyectoHecho = proyecto >= PASOS_PROYECTO;
+  const faltan = requisitosDominio(d, k), dominioOk = !faltan.length;
   return { rango: k, nombre: R.n, ...R.examen, sabe: R.sabe, min: R.min, objetivo, puntosOk, espera, repaso, multa: multaExamen(k), proyecto, proyectoHecho,
-    disponible: espera === 0 && repaso === 0 && proyectoHecho && indiceRango(d) === d.rangoMax };
+    areas: estadoAreas(d), faltan, dominioOk,
+    disponible: espera === 0 && repaso === 0 && proyectoHecho && dominioOk && indiceRango(d) === d.rangoMax };
 }
 /* Suma (o resta) puntos sin bajar de 0 y dice qué cambió:
    «examen» = ya tienes los puntos del rango siguiente: toca su examen · «recupera» = vuelves a tu rango
    aprobado · «baja» = los puntos bajaron del mínimo de tu rango. Subir de verdad solo pasa al aprobar. */
-function sumaPuntos(d, n) {
-  const antes = d.puntos, ra = indiceRango(d), exAntes = estadoExamen(d);
-  d.puntos = Math.max(0, antes + Math.round(n));
+function sumaPuntos(d, n, area, exAntes) {
+  const antes = d.puntos, ra = indiceRango(d); if (exAntes === undefined) exAntes = estadoExamen(d);
+  n = Math.round(n); let tope = null;
+  const t = tramoDe(d);
+  if (!t) d.puntos = Math.max(0, antes + n);   // en el último rango no hay topes
+  else {
+    const T = topes(t.k), mete = (a, x) => {
+      const zona = a === 'proyecto' ? 'codigo' : a;
+      const techo = T[zona] - (zona === 'codigo' && a !== 'proyecto' ? reservaProyecto(d, t.k) : 0);
+      let v = x > 0 ? Math.max(0, Math.min(x, techo - t[zona])) : Math.max(x, -d.puntos);
+      if (x > 0 && v < x) tope = tope || zona;
+      t[zona] += v; d.puntos += v;
+    };
+    if (area && (AREAS.includes(area) || area === 'proyecto')) mete(area, n);
+    else { const x = reparte(n); for (const a of AREAS) mete(a, x[a]); }   // sin parte (aprobar o suspender un examen): se reparte
+  }
   const delta = d.puntos - antes; dia(d).puntos += delta;
   const ri = indiceRango(d), ex = estadoExamen(d); let cambio = null;
   if (ri > ra) cambio = { tipo: 'recupera', i: ri };
   else if (ri < ra) cambio = { tipo: 'baja', i: ri };
   else if (ex && ex.disponible && !(exAntes && exAntes.disponible)) cambio = { tipo: 'examen', i: ex.rango };
-  return { delta, cambio, puntos: d.puntos };
+  return { delta, cambio, puntos: d.puntos, tope };
 }
 
 /* ── Exámenes de ascenso ──
@@ -241,8 +332,12 @@ function planExamen(D, I, k, semilla, voz = { sale: false }, J = null, E = null)
 }
 /* Anota un examen terminado (o abandonado, que cuenta como suspenso). Aprobar sube de rango y da puntos. */
 /* fallos: las preguntas falladas ({ area, spec }); quedan para repasar antes de poder repetirlo */
-function registraExamen(d, k, { bien, total, abandonado = false, fallos = [] }) {
-  const R = RANGOS[k], aprobado = !abandonado && total > 0 && bien / total >= R.examen.nota;
+function registraExamen(d, k, { bien, total, abandonado = false, fallos = [], areas = [] }) {
+  const R = RANGOS[k], porArea = {};
+  for (const q of areas) { const x = porArea[q.area] || (porArea[q.area] = { bien: 0, total: 0 }); x.total++; if (q.ok) x.bien++; }
+  // hay que llegar a la nota en el total y en cada parte: no vale compensar el código con el inglés
+  const flojas = Object.keys(porArea).filter(a => porArea[a].total && porArea[a].bien / porArea[a].total < R.examen.nota);
+  const aprobado = !abandonado && total > 0 && bien / total >= R.examen.nota && !flojas.length;
   d.examenes.historial.push({ dia: hoyClave(), rango: k, bien, total, aprobado, abandonado });
   if (d.examenes.historial.length > 30) d.examenes.historial.shift();
   if (!aprobado) {
@@ -250,34 +345,35 @@ function registraExamen(d, k, { bien, total, abandonado = false, fallos = [] }) 
     const antes = d.puntos, objetivo = Math.max(R.min, antes);
     const p = sumaPuntos(d, -multaExamen(k));
     d.examenes.reintento = objetivo; d.examenes.repaso = fallos.slice(0, 40).map(x => ({ area: x.area, spec: JSON.parse(JSON.stringify(x.spec)) }));
-    return { aprobado, nota: total ? bien / total : 0, puntos: p.delta, cambio: p.cambio && p.cambio.tipo === 'baja' ? p.cambio : null, repaso: d.examenes.repaso.length };
+    return { aprobado, nota: total ? bien / total : 0, puntos: p.delta, cambio: p.cambio && p.cambio.tipo === 'baja' ? p.cambio : null, repaso: d.examenes.repaso.length, porArea, flojas };
   }
   d.rangoMax = Math.max(d.rangoMax, k); d.examenes.reintento = 0; d.examenes.repaso = [];
-  const p = sumaPuntos(d, PUNTOS.examen);
-  return { aprobado, nota: bien / total, puntos: p.delta, cambio: { tipo: 'sube', i: k } };
+  tramoDe(d);   // empieza el tramo hacia el rango siguiente, con las tres partes vacías
+  const p = sumaPuntos(d, PUNTOS.examen);   // el premio se reparte entre las tres partes del tramo nuevo
+  return { aprobado, nota: bien / total, puntos: p.delta, cambio: { tipo: 'sube', i: k }, porArea, flojas };
 }
 /* Una pregunta del repaso del examen: bien la quita de la lista (+5); mal resta y se queda */
 function registraRepasoExamen(d, i, ok) {
-  const exAntes = estadoExamen(d);
+  const exAntes = estadoExamen(d), area = d.examenes.repaso[i] && d.examenes.repaso[i].area;
   if (ok) d.examenes.repaso.splice(i, 1);
-  const p = sumaPuntos(d, ok ? PUNTOS.repasoBien : PUNTOS.repasoFallo), ex = estadoExamen(d);
+  const p = sumaPuntos(d, ok ? PUNTOS.repasoBien : PUNTOS.repasoFallo, area, exAntes), ex = estadoExamen(d);
   let cambio = p.cambio;
   if (!cambio && ex && ex.disponible && !(exAntes && exAntes.disponible)) cambio = { tipo: 'examen', i: ex.rango };
-  return { puntos: p.delta, cambio, quedan: d.examenes.repaso.length };
+  return { puntos: p.delta, cambio, quedan: d.examenes.repaso.length, tope: p.tope };
 }
 /* Un paso del proyecto del rango k (0, 1 o 2): bien lo da por hecho (+40, y +100 al terminar); mal resta */
 function registraPaso(d, k, paso, ok) {
   const exAntes = estadoExamen(d), hechos = d.proyectos[k] || 0;
-  if (!ok) { const f = registraFallo(d, PUNTOS.ejercicioFallo); return { puntos: f.delta, cambio: f.cambio, hechos, terminado: false }; }
+  if (!ok) { const f = registraFallo(d, PUNTOS.ejercicioFallo, 'codigo'); return { puntos: f.delta, cambio: f.cambio, hechos, terminado: false }; }
   if (paso !== hechos) return { puntos: 0, cambio: null, hechos, terminado: hechos >= PASOS_PROYECTO };   // ya estaba hecho
   d.proyectos[k] = hechos + 1; const terminado = d.proyectos[k] >= PASOS_PROYECTO;
-  const p = sumaPuntos(d, PUNTOS.paso + (terminado ? PUNTOS.proyecto : 0)), ex = estadoExamen(d);
+  const p = sumaPuntos(d, PUNTOS.paso + (terminado ? PUNTOS.proyecto : 0), 'proyecto', exAntes), ex = estadoExamen(d);
   let cambio = p.cambio;
   if (!cambio && ex && ex.disponible && !(exAntes && exAntes.disponible)) cambio = { tipo: 'examen', i: ex.rango };
-  return { puntos: p.delta, cambio, hechos: d.proyectos[k], terminado };
+  return { puntos: p.delta, cambio, hechos: d.proyectos[k], terminado, tope: p.tope };
 }
 /* Fallos que también restan: comprobar un ejercicio del laboratorio que no pasa, o un turno de conversación no entendido */
-function registraFallo(d, cuanto) { d.combo = 0; return Object.assign(sumaPuntos(d, cuanto), { combo: 0 }); }
+function registraFallo(d, cuanto, area) { d.combo = 0; return Object.assign(sumaPuntos(d, cuanto, area), { combo: 0 }); }
 
 /* ── Habla de programador: bloques, repaso y práctica ── */
 const progBloque = (d, id) => d.jerga.bloques[id] || (d.jerga.bloques[id] = { ultimos: [], intentos: 0, aciertos: 0 });
@@ -294,14 +390,14 @@ function pendientesJerga(d, J, hoy = hoyClave()) {
     .sort((a, b) => (a.t.vence < b.t.vence ? -1 : a.t.vence > b.t.vence ? 1 : a.t.caja - b.t.caja));
 }
 function registraJerga(d, J, r) {
-  const antes = bloquesDominados(d, J), x = dia(d);
+  const ex0 = estadoExamen(d), antes = bloquesDominados(d, J), x = dia(d);
   x.jerga++; if (r.ok) x.jergaOk++;
   anota(progBloque(d, r.bloque), r.ok);
   if (r.item && J.itemPorClave(r.item)) apunta(d.jerga.tarjetas, r.item, r.ok);
   const base = puntosRespuesta(d, r.ok, PUNTOS.jerga, PUNTOS.jergaFallo);
   const ahora = bloquesDominados(d, J), bloque = ahora > antes ? ahora : 0;
-  const p = sumaPuntos(d, base + (bloque ? PUNTOS.unidad : 0));
-  return { bloque, puntos: p.delta, cambio: p.cambio, combo: d.combo };
+  const p = sumaPuntos(d, base + (bloque ? PUNTOS.unidad : 0), 'habla', ex0);
+  return { bloque, puntos: p.delta, cambio: p.cambio, combo: d.combo, tope: p.tope };
 }
 /* Puntos de una respuesta: el acierto suma más cuanto más larga es la racha de aciertos; el fallo resta y la corta */
 function puntosRespuesta(d, ok, base, fallo) {
@@ -342,7 +438,7 @@ function debiles(d, D, n = 3) {
 /* ── Registrar un reto respondido ── */
 const anota = (t, ok) => { t.intentos++; if (ok) t.aciertos++; t.ultimos.push(ok ? 1 : 0); if (t.ultimos.length > 10) t.ultimos.shift(); };
 function registraReto(d, D, r) {
-  const antes = dominados(d, D), x = dia(d);
+  const ex0 = estadoExamen(d), antes = dominados(d, D), x = dia(d);
   x.retos++; if (r.ok) x.aciertos++;
   anota(d.temas[r.tema] || (d.temas[r.tema] = { ultimos: [], intentos: 0, aciertos: 0 }), r.ok);
   const pl = d.porLang[r.lang]; if (pl) { pl.retos++; if (r.ok) pl.aciertos++; }
@@ -350,15 +446,15 @@ function registraReto(d, D, r) {
   if (r.tarea) { const e = d.escritos[r.tarea] || (d.escritos[r.tarea] = { aciertos: 0, fallos: 0 }); if (r.ok) e.aciertos++; else e.fallos++; }
   const base = puntosRespuesta(d, r.ok, r.tipo === 'escribe' ? PUNTOS.escribe : r.tipo === 'completa' ? PUNTOS.completa : PUNTOS.reto, PUNTOS.retoFallo);
   const ahora = dominados(d, D), cinturon = ahora > antes ? ahora : 0, metaCumplida = x.retos === d.ajustes.meta;
-  const p = sumaPuntos(d, base + (metaCumplida ? PUNTOS.meta : 0) + (cinturon ? PUNTOS.cinturon : 0));
-  return { cinturon, metaCumplida, puntos: p.delta, cambio: p.cambio, combo: d.combo };
+  const p = sumaPuntos(d, base + (metaCumplida ? PUNTOS.meta : 0) + (cinturon ? PUNTOS.cinturon : 0), 'codigo', ex0);
+  return { cinturon, metaCumplida, puntos: p.delta, cambio: p.cambio, combo: d.combo, tope: p.tope };
 }
 function registraEjercicio(d, D, id, lang) {
-  const antes = dominados(d, D); const e = d.ejercicios[id] || (d.ejercicios[id] = {});
+  const ex0 = estadoExamen(d), antes = dominados(d, D); const e = d.ejercicios[id] || (d.ejercicios[id] = {});
   const nuevo = !e[lang]; e[lang] = true;
   const ahora = dominados(d, D), cinturon = ahora > antes ? ahora : 0;
-  const p = sumaPuntos(d, (nuevo ? PUNTOS.ejercicio : 0) + (cinturon ? PUNTOS.cinturon : 0));
-  return { nuevo, cinturon, puntos: p.delta, cambio: p.cambio };
+  const p = sumaPuntos(d, (nuevo ? PUNTOS.ejercicio : 0) + (cinturon ? PUNTOS.cinturon : 0), 'codigo', ex0);
+  return { nuevo, cinturon, puntos: p.delta, cambio: p.cambio, tope: p.tope };
 }
 
 /* ── Inglés: unidades, repaso y conversación ── */
@@ -379,6 +475,7 @@ function pendientesIngles(d, I, hoy = hoyClave()) {
 }
 /* r: { unidad, item, ok, habla, casi }. «habla» = ejercicio de pronunciar (resta menos: el micrófono también se equivoca) */
 function registraIngles(d, I, r) {
+  const ex0 = estadoExamen(d);
   const antes = unidadesDominadas(d, I), x = dia(d);
   x.ingles++; if (r.ok) x.inglesOk++;
   anota(progUnidad(d, r.unidad), r.ok);
@@ -386,26 +483,32 @@ function registraIngles(d, I, r) {
   const base = r.habla && r.casi && !r.ok ? PUNTOS.hablaCasi
     : puntosRespuesta(d, r.ok, r.habla ? PUNTOS.habla : PUNTOS.ingles, r.habla ? PUNTOS.hablaFallo : PUNTOS.inglesFallo);
   const ahora = unidadesDominadas(d, I), unidad = ahora > antes ? ahora : 0, metaCumplida = x.ingles === d.ajustes.metaIngles;
-  const p = sumaPuntos(d, base + (metaCumplida ? PUNTOS.metaIngles : 0) + (unidad ? PUNTOS.unidad : 0));
-  return { unidad, metaCumplida, puntos: p.delta, cambio: p.cambio, combo: d.combo };
+  const p = sumaPuntos(d, base + (metaCumplida ? PUNTOS.metaIngles : 0) + (unidad ? PUNTOS.unidad : 0), 'ingles', ex0);
+  return { unidad, metaCumplida, puntos: p.delta, cambio: p.cambio, combo: d.combo, tope: p.tope };
 }
 /* Una conversación cuenta si respondiste bien a casi todos los turnos (puedes fallar uno). No resta: es para soltarse. */
 function registraConversacion(d, I, id, { turnos, bien }) {
+  const ex0 = estadoExamen(d);
   const completa = turnos >= 3 && bien >= turnos - 1;
   if (!completa) return { completa, puntos: 0, cambio: null, unidad: 0 };
   const antes = unidadesDominadas(d, I), u = progUnidad(d, id), primera = u.conversa === 0; u.conversa++;
   const ahora = unidadesDominadas(d, I), unidad = ahora > antes ? ahora : 0;
-  const p = sumaPuntos(d, (primera ? PUNTOS.conversa : PUNTOS.conversaOtra) + (unidad ? PUNTOS.unidad : 0));
-  return { completa, primera, puntos: p.delta, cambio: p.cambio, unidad };
+  const p = sumaPuntos(d, (primera ? PUNTOS.conversa : PUNTOS.conversaOtra) + (unidad ? PUNTOS.unidad : 0), 'ingles', ex0);
+  return { completa, primera, puntos: p.delta, cambio: p.cambio, unidad, tope: p.tope };
 }
 
 /* ── Qué hacer ahora ── */
 function siguientePaso(d, D, estado = {}, I = null) {
   const t = temaActual(d, D), e = estadoTema(d, D, t.id), hoy = leeDia(d), pend = pendientes(d, D).length;
   const ex = estadoExamen(d);
-  if (ex && ex.puntosOk && !ex.proyectoHecho && !ex.repaso && !estado.foco && indiceRango(d) === d.rangoMax) return { id: 'proyecto', titulo: `Termina tu proyecto para el examen de «${ex.nombre}»`, texto: `Ya tienes los puntos. Antes del examen, escribe el proyecto del rango: llevas ${ex.proyecto} de ${PASOS_PROYECTO} pasos. Se escribe a mano, como en papel.`, accion: 'examen', boton: 'Seguir el proyecto' };
+  const retosLlenos = ex && ex.areas && ex.areas.codigo.tiene >= ex.areas.codigo.tope - ex.areas.codigo.reserva;
+  if (ex && retosLlenos && !ex.proyectoHecho && !ex.repaso && !estado.foco && indiceRango(d) === d.rangoMax) return { id: 'proyecto', titulo: `Termina tu proyecto para el examen de «${ex.nombre}»`, texto: `Los retos ya dieron su parte de código; el resto lo da el proyecto del rango: llevas ${ex.proyecto} de ${PASOS_PROYECTO} pasos. Se escribe a mano, como en papel.`, accion: 'examen', boton: 'Seguir el proyecto' };
   if (ex && ex.repaso && !estado.foco) return { id: 'repaso-examen', titulo: `Repasa lo que fallaste en el examen`, texto: `Te quedan ${ex.repaso} ${ex.repaso === 1 ? 'pregunta' : 'preguntas'} del examen de «${ex.nombre}». Respóndelas bien para poder repetirlo${ex.espera ? ` (y recupera ${ex.espera} puntos)` : ''}.`, accion: 'examen', boton: 'Repasar' };
-  if (ex && ex.disponible && !estado.foco) return { id: 'examen', titulo: `Examen para «${ex.nombre}»`, texto: `Ya tienes los puntos. Para subir de rango, aprueba el examen: ${ex.preguntas} preguntas sin ayuda de código y de inglés; necesitas el ${Math.round(ex.nota * 100)} %.`, accion: 'examen', boton: 'Ver el examen' };
+  if (ex && ex.puntosOk && ex.proyectoHecho && !ex.repaso && !ex.dominioOk && !estado.foco && indiceRango(d) === d.rangoMax) {
+    const f = ex.faltan[0];
+    return { id: 'requisito', titulo: `Para el examen te falta dominar «${f.titulo}»`, texto: `${NOMBRE_AREA[f.area]}: ${f.falta}. Ya tienes los puntos y el proyecto; el examen se abre cuando domines todo lo que entra${ex.faltan.length > 1 ? ` (te quedan ${ex.faltan.length} cosas)` : ''}.`, accion: 'requisito', req: f, boton: 'Practicarlo' };
+  }
+  if (ex && ex.disponible && !estado.foco) return { id: 'examen', titulo: `Examen para «${ex.nombre}»`, texto: `Ya tienes los puntos y dominas lo que entra. Para subir de rango, aprueba el examen: ${ex.preguntas} preguntas sin ayuda de código, inglés y habla; necesitas el ${Math.round(ex.nota * 100)} % en cada parte.`, accion: 'examen', boton: 'Ver el examen' };
   if (estado.foco) return { id: 'foco', titulo: 'Estás en tu bloque de foco', texto: `Lee la lección de «${t.titulo}» y resuelve su ejercicio sin mirar a Claude.`, accion: 'tema', boton: 'Abrir la lección' };
   if (dominados(d, D) >= D.temas.length) return { id: 'fin', titulo: 'Dominaste los diez temas', texto: 'Ya tienes la base de los tres lenguajes. Ahora toca un proyecto tuyo en el laboratorio, y repasar para no olvidar.', accion: 'lab', boton: 'Ir al laboratorio' };
   if (e.retos && !e.ej) return { id: 'ejercicio', titulo: `Te falta el ejercicio de «${t.titulo}»`, texto: 'Ya dominas sus retos. Escribe el ejercicio en el laboratorio para ganar el siguiente cinturón.', accion: 'ejercicio', boton: 'Resolver el ejercicio' };
@@ -439,6 +542,7 @@ function leeCodigoProgreso(txt, D, I, J) {
 const Nucleo = { VERSION, LANGS, INTERVALOS, RANGOS, PUNTOS, hoyClave, sumaDias, diasAtras, NUEVO, normaliza, estadoTema, dominados, temaActual, racha, dia, leeDia,
   PASOS_PROYECTO, registraPaso, rangoDe, rangoActual, estadoExamen, planExamen, registraExamen, registraRepasoExamen, registraFallo, multaExamen, sumaPuntos,
   estadoBloque, bloquesDominados, bloqueActual, pendientesJerga, registraJerga, apuntaTarjeta, pendientes, debiles, registraReto, registraEjercicio, ejercicioHecho, siguientePaso, semana, totales, codigoProgreso, leeCodigoProgreso,
-  estadoUnidad, unidadesDominadas, unidadActual, pendientesIngles, registraIngles, registraConversacion };
+  estadoUnidad, unidadesDominadas, unidadActual, pendientesIngles, registraIngles, registraConversacion,
+  AREAS, REPARTO, NOMBRE_AREA, topes, estadoAreas, requisitosDominio };
 if (typeof module !== 'undefined' && module.exports) module.exports = Nucleo; else raiz.Nucleo = Nucleo;
 })(typeof window !== 'undefined' ? window : globalThis);

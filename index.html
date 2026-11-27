@@ -102,6 +102,16 @@ a { color: var(--ai); }
 .rubrica li { display: grid; gap: 1px; }
 .rubrica li.si b { color: var(--bien); } .rubrica li.no b { color: var(--mal); }
 .rubrica li span { font-size: 14px; color: var(--tinta-2, inherit); }
+.partes-rango { display: grid; gap: 4px; font-size: 12px; font-weight: 500; color: var(--tinta-2); }
+.lateral .partes-rango { flex: 1 1 100%; order: 5; }
+.rango-tarjeta .partes-rango { font-size: 13px; }
+.partes-rango .parte { display: grid; grid-template-columns: 50px 1fr auto; gap: 6px; align-items: center; }
+.partes-rango .barra { height: 5px; margin: 0; }
+.partes-rango .parte.llena .barra > i { background: var(--bien); }
+.requisitos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.requisitos li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.requisitos li .pila { gap: 1px; }
+.requisitos li.si b { color: var(--bien); } .requisitos li.no b { color: var(--mal); }
 .nav-capitulos { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; min-width: 0; }
 .nav-capitulos select { width: 100%; min-width: 0; text-overflow: ellipsis; }
 @media (max-width: 560px) {
@@ -128,7 +138,7 @@ select.campo, input.campo, textarea.campo { border: 1px solid var(--linea); back
 .rango-texto small { font-size: 11.5px; color: var(--tinta-3); font-weight: 500; }
 .lateral .rango-mini { flex-wrap: wrap; row-gap: 8px; }
 .lateral .rango-mini .rango-texto { flex: 1 1 calc(100% - 50px); }
-.lateral .rango-mini .barra { flex: 1 1 calc(100% - 80px); order: 3; height: 6px; }
+.lateral .rango-mini > .barra { flex: 1 1 calc(100% - 80px); order: 3; height: 6px; }
 .lateral .rango-mini .insignia { order: 4; }
 @media (max-width: 520px) { .cabecera .marca > span:not(.sello) { display: none; } }
 .insignia.mal { background: var(--mal-suave); color: var(--mal); }

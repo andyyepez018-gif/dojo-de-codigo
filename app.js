@@ -79,22 +79,44 @@ function pintaRango() {
     el.append(U.emblema(rg.i, id === 'rango-lateral' ? 34 : 28, rg.rango.n),
       h('span', { class: 'rango-texto' }, h('b', { class: 'rango-nombre' }, rg.rango.n), h('small', { class: 'num' }, `${U.miles(P.d.puntos)} puntos`)),
       h('span', { class: 'insignia kihada num', title: 'Días seguidos practicando (5 retos, 5 ejercicios de inglés o 10 min de foco)' }, `${r} ${r === 1 ? 'día' : 'días'}`));
+    if (id === 'rango-lateral') { const pr = partesRango(); if (pr) el.append(pr); }
     if (id === 'rango-lateral' && rg.siguiente) el.append(h('div', { class: 'barra kihada', role: 'progressbar', 'aria-label': 'Hacia el rango ' + rg.siguiente.n, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(rg.prop * 100)), title: rg.faltan ? `Faltan ${U.miles(rg.faltan)} puntos para el examen de «${rg.siguiente.n}»` : `Examen de «${rg.siguiente.n}» disponible` }, h('i', { style: `width:${Math.round(rg.prop * 100)}%` })));
   }
 }
+/* Las tres partes del rango (código, inglés y habla): cuánto lleva cada una de lo que puede dar */
+function partesRango() {
+  const ar = N.estadoAreas(P.d); if (!ar || N.rangoActual(P.d).i !== P.d.rangoMax) return null;
+  return h('div', { class: 'partes-rango' }, ...N.AREAS.map(a => {
+    const x = ar[a], pct = Math.max(0, Math.min(100, Math.round(x.tiene / x.tope * 100)));
+    return h('div', { class: 'parte' + (x.lleno ? ' llena' : ''), title: `${x.nombre}: ${U.miles(Math.max(0, x.tiene))} de ${U.miles(x.tope)} puntos de este rango` },
+      h('span', null, x.nombre.split(' ')[0]), h('div', { class: 'barra', role: 'progressbar', 'aria-label': `${x.nombre} en este rango`, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct) }, h('i', { style: `width:${pct}%` })),
+      h('small', { class: 'num' }, `${U.miles(Math.max(0, x.tiene))}/${U.miles(x.tope)}`));
+  }));
+}
 /* Después de cualquier respuesta: guardar, repintar el rango y avisar si subes, recuperas o bajas de rango */
+const avisosTope = new Set();
 function trataPuntos(res, ok) {
   U.vibra(ok ? 18 : [40, 50, 40], P.d.ajustes.vibrar);
   P.cambio(); pintaRango(); tic();
+  avisaTope(res);
   const c = res && res.cambio; if (!c) return;
   const R = N.RANGOS[c.i], sig = N.RANGOS[c.i + 1];
   if (c.tipo === 'sube') U.celebra(c.i, `Examen aprobado. ${R.lema} ${sig ? `El examen de «${sig.n}» se abre con ${U.miles(sig.min)} puntos.` : 'Llegaste al rango más alto del Dojo.'}`, { figura: U.emblema(c.i, 92, R.n), etiqueta: `Nuevo rango · ${c.i + 1} de ${N.RANGOS.length}`, titulo: R.n });
-  else if (c.tipo === 'examen') U.celebra(c.i, `Tienes los puntos de «${R.n}». Para subir, aprueba su examen: ${R.examen.preguntas} preguntas de código e inglés, sin ninguna ayuda. Necesitas el ${Math.round(R.examen.nota * 100)} %.`, { figura: U.emblema(c.i, 92, R.n), etiqueta: 'Examen de ascenso disponible', titulo: R.n, accion: { texto: 'Ver el examen', fn: () => ir('examen') } });
+  else if (c.tipo === 'examen') U.celebra(c.i, `Ya puedes hacer el examen de «${R.n}»: tienes los puntos de las tres partes y dominas lo que entra. Para subir, aprueba su examen: ${R.examen.preguntas} preguntas de código e inglés, sin ninguna ayuda. Necesitas el ${Math.round(R.examen.nota * 100)} %.`, { figura: U.emblema(c.i, 92, R.n), etiqueta: 'Examen de ascenso disponible', titulo: R.n, accion: { texto: 'Ver el examen', fn: () => ir('examen') } });
   else if (c.tipo === 'recupera') aviso(`Recuperaste el rango «${R.n}».`, 4000);
   else if (c.tipo === 'baja') aviso(`Bajaste a «${R.n}». Con ${U.miles(sig.min - P.d.puntos)} puntos más recuperas «${sig.n}».`, 5500);
 }
+/* Una parte ya dio todos sus puntos de este rango: se dice una vez por sesión, con lo que falta */
+function avisaTope(res) {
+  if (!res || !res.tope || !P.d.tramo) return;
+  const clave = res.tope + '|' + P.d.tramo.k; if (avisosTope.has(clave)) return; avisosTope.add(clave);
+  const ar = N.estadoAreas(P.d), ex = N.estadoExamen(P.d), resto = N.AREAS.filter(a => !ar[a].lleno).map(a => ar[a].nombre);
+  const proy = res.tope === 'codigo' && ex && !ex.proyectoHecho ? ' Lo que queda de código lo da el proyecto del rango.' : '';
+  aviso(`${N.NOMBRE_AREA[res.tope]} ya dio todos sus puntos de este rango.${proy} ${resto.length ? 'Ahora suman: ' + resto.join(' y ') + '.' : 'Mira en el examen qué te falta.'} Seguir practicando sigue contando para dominar los temas.`, 7000);
+}
 function chipPuntos(res) {
   if (!res || typeof res.puntos !== 'number') return null;
+  if (res.puntos === 0 && res.tope) return h('span', { class: 'insignia num', title: 'Esta parte ya dio todos sus puntos de este rango' }, `+0 · ${N.NOMBRE_AREA[res.tope]} ya está lleno`);
   const p = res.puntos, combo = res.combo >= 3 ? ` · ${res.combo} seguidos` : '';
   return h('span', { class: 'insignia num ' + (p > 0 ? 'kihada' : p < 0 ? 'mal' : ''), title: 'Puntos de esta respuesta' }, `${p > 0 ? '+' : p < 0 ? '−' : ''}${Math.abs(p)} puntos${combo}`);
 }
@@ -116,7 +138,8 @@ function tablaPuntos() {
       fila('Reto de código fallado', `−${-X.retoFallo}`, 'menos'), fila('Ejercicio de inglés o de habla fallado', `−${-X.inglesFallo}`, 'menos'), fila('Frase mal pronunciada', `−${-X.hablaFallo}`, 'menos'),
       fila('Ejercicio del laboratorio que no pasa al comprobar', `−${-X.ejercicioFallo}`, 'menos'), fila('Respuesta no entendida en una conversación', `−${-X.conversaFallo}`, 'menos'),
       fila('Fallo en el repaso del examen', `−${-X.repasoFallo}`, 'menos'), fila('Examen suspendido', '−10 % de los puntos del rango', 'menos')),
-      h('p', { class: 'tenue', style: 'font-size:13px' }, `Subir de rango pide dos cosas: llegar a sus puntos y aprobar su examen (código, inglés y habla de programador), sin ayuda. Suspender resta el 10 % de los puntos de ese rango y te deja un repaso obligatorio de lo que fallaste; cuando lo termines y vuelvas a tus puntos, lo repites. La racha: cada acierto seguido suma +1 más, hasta +${X.comboMax}; un fallo la corta. Los puntos nunca bajan de 0. Si bajan del mínimo de tu rango, bajas, y lo recuperas al volver a subir (sin repetir el examen). Equivocarse resta en todo: retos, inglés, habla, ejercicios del laboratorio y conversaciones.`)));
+      h('p', { class: 'tenue', style: 'font-size:13px' }, `Los puntos de cada rango vienen de tres partes: código (el ${Math.round(N.REPARTO.codigo * 100)} %, con el proyecto), inglés (el ${Math.round(N.REPARTO.ingles * 100)} %) y habla de programador (el ${Math.round(N.REPARTO.habla * 100)} %). Cada parte da su porción y ahí se para: con una sola no se llega. Para el examen, además, hay que dominar lo que entra y terminar el proyecto.`),
+      h('p', { class: 'tenue', style: 'font-size:13px' }, `Subir de rango pide aprobar su examen (código, inglés y habla de programador), sin ayuda y con la nota mínima en cada parte. Suspender resta el 10 % de los puntos de ese rango y te deja un repaso obligatorio de lo que fallaste; cuando lo termines y vuelvas a tus puntos, lo repites. La racha: cada acierto seguido suma +1 más, hasta +${X.comboMax}; un fallo la corta. Los puntos nunca bajan de 0. Si bajan del mínimo de tu rango, bajas, y lo recuperas al volver a subir (sin repetir el examen). Equivocarse resta en todo: retos, inglés, habla, ejercicios del laboratorio y conversaciones.`)));
 }
 function escaleraRangos() {
   const rg = N.rangoActual(P.d);
@@ -219,7 +242,7 @@ function empiezaFoco(minutos) {
 function terminaFoco(completo) {
   if (!foco) return;
   const min = completo ? foco.minutos : Math.min(foco.minutos, Math.floor((Date.now() - foco.inicio) / 60e3));
-  N.dia(P.d).foco += min; const pf = N.sumaPuntos(P.d, min * N.PUNTOS.focoMin); foco = null; ls.set('foco', null); trataPuntos(pf, true); pintaBandas();
+  N.dia(P.d).foco += min; const pf = N.sumaPuntos(P.d, min * N.PUNTOS.focoMin, 'codigo'); foco = null; ls.set('foco', null); trataPuntos(pf, true); pintaBandas();
   aviso(min > 0 ? `Bloque de foco: ${min} min sumados. Ya puedes mirar qué hizo Claude.` : 'Bloque cancelado.');
   if (vista === 'hoy') PINTA.hoy();
 }
@@ -305,6 +328,7 @@ function accionPaso(p) {
   else if (p.accion === 'ejercicio') { const t = temaActual(); const ej = t.ejercicios.find(e => !N.ejercicioHecho(P.d, e.id)) || t.ejercicios[0]; abrirLab({ ejercicio: ej.id }); }
   else if (p.accion === 'ingles') VI.practicar();
   else if (p.accion === 'examen') { if (p.id === 'proyecto') VE.abreProyecto(); else if (N.estadoExamen(P.d) && N.estadoExamen(P.d).repaso) VE.empiezaRepaso(); else ir('examen'); }
+  else if (p.accion === 'requisito') practicaRequisito(p.req);
   else if (p.accion === 'foco') empiezaFoco();
   else if (p.accion === 'tema') abrirTema(temaActual().id);
   else abrirLab({});
@@ -358,10 +382,13 @@ PINTA.hoy = function () {
     h('div', { class: 'entre' }, h('b', { class: 'num puntos-grandes' }, `${U.miles(P.d.puntos)} puntos`), h('span', { class: 'insignia num ' + (d.puntos > 0 ? 'kihada' : d.puntos < 0 ? 'mal' : '') }, `Hoy ${d.puntos > 0 ? '+' : d.puntos < 0 ? '−' : ''}${U.miles(Math.abs(d.puntos))}`)),
     rg.siguiente ? h('div', { class: 'pila', style: 'gap:6px' }, h('div', { class: 'barra kihada', role: 'progressbar', 'aria-label': 'Hacia el examen de ' + rg.siguiente.n, 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(rg.prop * 100)) }, h('i', { style: `width:${Math.round(rg.prop * 100)}%` })),
       h('small', { class: 'tenue' }, rg.i < P.d.rangoMax ? `Bajaste de rango: con ${U.miles(rg.faltan)} puntos más recuperas «${rg.siguiente.n}» (sin repetir el examen).`
-        : rg.faltan ? `Faltan ${U.miles(rg.faltan)} puntos para el examen de «${rg.siguiente.n}». Acertar suma; fallar resta.`
+        : rg.faltan ? `Faltan ${U.miles(rg.faltan)} puntos para el examen de «${rg.siguiente.n}». Cada parte da los suyos y ahí se para: hay que llenar las tres. Acertar suma; fallar resta.`
         : ex && ex.espera ? `Suspendiste el examen de «${rg.siguiente.n}». Practica ${U.miles(ex.espera)} puntos más para repetirlo.`
+        : ex && !ex.disponible ? `Tienes los puntos de las tres partes. Mira en el examen qué más te falta (el proyecto o dominar algún tema).`
         : `Tienes los puntos de «${rg.siguiente.n}»: aprueba su examen para subir.`),
-      ex && ex.disponible ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ir('examen') }, `Hacer el examen de «${ex.nombre}»`)) : null)
+      partesRango(),
+      ex && ex.disponible ? h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ir('examen') }, `Hacer el examen de «${ex.nombre}»`))
+        : ex && rg.i === P.d.rangoMax ? h('div', { class: 'fila' }, h('button', { class: 'btn chico', id: 'ver-requisitos', onclick: () => ir('examen') }, 'Ver qué me falta para el examen')) : null)
       : h('p', null, 'Estás en la cima. Sigue practicando: si los puntos bajan de 30.000, bajas de rango.'),
     h('details', { class: 'desplegable' }, h('summary', null, 'Los 10 rangos y cómo se ganan los puntos'), escaleraRangos(), tablaPuntos()));
   const rango = h('section', { class: 'tarjeta' },
@@ -940,7 +967,7 @@ function comprobar() {
   } else {
     const f = resultados.find(r => !r.ok);
     ultimoFallo = f.error ? { tipo: 'error', linea: f.error.linea, mensaje: f.error.message } : { tipo: 'prueba', entradas: f.entradas, esperado: f.esperado, salida: f.salida };
-    trataPuntos(N.registraFallo(P.d, N.PUNTOS.ejercicioFallo), false); aviso(`El ejercicio aún no pasa las pruebas: −${-N.PUNTOS.ejercicioFallo} puntos. Mira qué falla abajo.`, 4500);
+    trataPuntos(N.registraFallo(P.d, N.PUNTOS.ejercicioFallo, 'codigo'), false); aviso(`El ejercicio aún no pasa las pruebas: −${-N.PUNTOS.ejercicioFallo} puntos. Mira qué falla abajo.`, 4500);
     if (f.error && f.error.linea) editor.marca(f.error.linea);
     lab.datos = f.entradas.join('\n');
   }
@@ -1029,7 +1056,7 @@ function pintaVistaHtml() {
   const lec = D.html.find(x => x.id === lab.html), checks = lec.comprobar(doc, src);
   const lista = $('#checks-html'); lista.textContent = '';
   checks.forEach(c => lista.append(h('li', { class: c.ok ? 'si' : '' }, (c.ok ? '✓ ' : '○ ') + c.texto)));
-  if (checks.every(c => c.ok) && !P.d.html[lec.id]) { P.d.html[lec.id] = true; trataPuntos(N.sumaPuntos(P.d, N.PUNTOS.html), true); aviso(`Lección de HTML «${lec.titulo}» completada: +${N.PUNTOS.html} puntos.`); }
+  if (checks.every(c => c.ok) && !P.d.html[lec.id]) { P.d.html[lec.id] = true; trataPuntos(N.sumaPuntos(P.d, N.PUNTOS.html, 'codigo'), true); aviso(`Lección de HTML «${lec.titulo}» completada: +${N.PUNTOS.html} puntos.`); }
 }
 function pintaHtml() {
   const lec = D.html.find(x => x.id === lab.html) || D.html[0];
@@ -1180,7 +1207,17 @@ function tarjetaPrivacidad() {
 }
 
 /* ───────────── INGLÉS (vista-ingles.js) ───────────── */
-const VE = window.VistaExamen({ P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista: () => vista });
+const VE = window.VistaExamen({ P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, practica: x => practicaRequisito(x), vista: () => vista });
+/* Ir a practicar justo lo que falta dominar para el examen (un tema, una unidad o un bloque) */
+function practicaRequisito(x) {
+  if (!x) return;
+  if (x.area === 'codigo') {
+    const e = N.estadoTema(P.d, D, x.id), t = D.temas.find(y => y.id === x.id);
+    if (e.retos && !e.ej) { const ej = t.ejercicios.find(z => !N.ejercicioHecho(P.d, z.id)) || t.ejercicios[0]; abrirLab({ ejercicio: ej.id }); return; }
+    P.d.ajustes.tema = x.id; P.cambio(); reto = null; nuevoReto(); ir('retos');
+  } else if (x.area === 'ingles') { const e = N.estadoUnidad(P.d, I, x.id); if (e.retos && !e.conversa) VI.abrirUnidad(x.id); else VI.practicar(x.id); }
+  else if (x.area === 'habla') VH.practicar(x.id);
+}
 const VS = window.VistaEstudio({ D, G: window.Estudio, W, M, U, ir, aviso, abrirLab, vista: () => vista });
 PINTA.estudio = () => VS.pinta();
 const VH = window.VistaHabla({ P, N, J, U, Voz, ir, aviso, botonTutor, trataPuntos, chipPuntos, vista: () => vista });

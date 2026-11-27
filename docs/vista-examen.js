@@ -7,7 +7,7 @@
 (function (raiz) {
 'use strict';
 raiz.VistaExamen = function (ctx) {
-  const { P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, vista } = ctx;
+  const { P, N, D, I, J, W, U, Voz, ir, aviso, trataPuntos, chipPuntos, practica, vista } = ctx;
   const { $, h, ls, NL, bloqueCodigo, salidaBloque } = U;
   const LANGS = ['ps', 'py', 'cpp'];
   const st = { fase: 'intro', k: 0, preguntas: [], i: 0, resp: null, armado: [], res: null, langEsc: ls.get('lang-escribir', null), proy: { paso: null, fallos: 0, res: null } };
@@ -80,7 +80,8 @@ raiz.VistaExamen = function (ctx) {
     const bien = abandonado ? 0 : st.preguntas.filter(q => q.ok).length, total = st.preguntas.length;
     ls.set(EN_CURSO, null);
     const fallos = st.preguntas.filter(q => abandonado || !q.ok).map(q => ({ area: q.area, spec: q.spec }));
-    st.res = N.registraExamen(P.d, st.k, { bien, total, abandonado, fallos });
+    const areas = st.preguntas.map(q => ({ area: q.area, ok: !abandonado && !!q.ok }));
+    st.res = N.registraExamen(P.d, st.k, { bien, total, abandonado, fallos, areas });
     st.res.bien = bien; st.res.total = total; st.fase = abandonado ? 'intro' : 'resultado';
     trataPuntos(st.res, st.res.aprobado);
     if (!abandonado) { pinta(); window.scrollTo(0, 0); }
@@ -215,9 +216,13 @@ raiz.VistaExamen = function (ctx) {
         h('span', { class: 'etiqueta' }, `Examen para «${R.n}»`),
         h('h1', null, r.aprobado ? `Aprobado: ya eres ${R.n}` : 'Suspendido'),
         h('p', { class: 'nota-examen num' }, `${nota} %`, h('small', null, ` · ${r.bien} de ${r.total} bien · hacía falta el ${minimo} %`)),
-        h('p', { class: 'tenue' }, `Código: ${cod.filter(q => q.ok).length} de ${cod.length} · Inglés: ${ing.filter(q => q.ok).length} de ${ing.length} · Habla: ${hab.filter(q => q.ok).length} de ${hab.length}`),
-        r.aprobado ? h('p', null, `+${N.PUNTOS.examen} puntos. ${ex ? `El siguiente examen, el de «${ex.nombre}», se abre con ${U.miles(ex.min)} puntos.` : 'Era el último: estás en la cima.'}`)
-          : h('p', null, `${r.puntos ? `−${U.miles(-r.puntos)} puntos. ` : ''}Ahora toca repasar las ${r.repaso} preguntas que fallaste, con su explicación, y volver a tener ${U.miles(ex ? ex.objetivo : 0)} puntos. Entonces podrás repetirlo.`),
+        h('ul', { class: 'requisitos', id: 'ex-partes' }, ...[['codigo', cod], ['ingles', ing], ['habla', hab]].filter(([, qs]) => qs.length).map(([a, qs]) => {
+          const b = qs.filter(q => q.ok).length, okA = b / qs.length >= R.examen.nota;
+          return h('li', { class: okA ? 'si' : 'no' }, h('span', { class: 'pila' }, h('b', null, `${okA ? '✓' : '✗'} ${N.NOMBRE_AREA[a]}: ${b} de ${qs.length} (${Math.round(b / qs.length * 100)} %)`)));
+        })),
+        !r.aprobado && r.flojas && r.flojas.length && nota >= minimo ? h('p', null, `La nota total llega, pero ${r.flojas.map(a => N.NOMBRE_AREA[a].toLowerCase()).join(' y ')} no llega${r.flojas.length > 1 ? 'n' : ''} al ${minimo} %: cada parte tiene que aprobarse por sí sola.`) : null,
+        r.aprobado ? h('p', null, `+${N.PUNTOS.examen} puntos, repartidos entre las tres partes del rango nuevo. ${ex ? `El siguiente examen, el de «${ex.nombre}», se abre al llenar las tres partes (${U.miles(ex.min)} puntos) y dominar lo que entra.` : 'Era el último: estás en la cima.'}`)
+          : h('p', null, `${r.puntos ? `−${U.miles(-r.puntos)} puntos, repartidos entre las tres partes. ` : ''}Ahora toca repasar las ${r.repaso} preguntas que fallaste, con su explicación, y volver a llenar las tres partes (${U.miles(ex ? ex.objetivo : 0)} puntos). Entonces podrás repetirlo.`),
         h('div', { class: 'fila' }, r.aprobado ? h('button', { class: 'btn primario', onclick: () => { st.fase = 'intro'; ir('hoy'); } }, 'Volver a Hoy')
           : h('button', { class: 'btn primario', onclick: empiezaRepaso }, 'Repasar lo que fallé'))),
       fallos.length ? h('section', { class: 'tarjeta' }, h('h2', null, `Lo que fallaste (${fallos.length})`),
@@ -229,6 +234,7 @@ raiz.VistaExamen = function (ctx) {
     const ex = N.estadoExamen(P.d), rg = N.rangoActual(P.d);
     if (!ex) return h('div', { class: 'columna' }, h('section', { class: 'tarjeta' }, h('h1', null, 'No quedan exámenes'), h('p', null, 'Aprobaste los nueve. Eres Ingeniero de élite: mantén los puntos practicando.'), h('div', { class: 'fila' }, h('button', { class: 'btn primario', onclick: () => ir('hoy') }, 'Volver a Hoy'))));
     const temas = D.temas.slice(0, ex.temas), unidades = I.unidades.slice(0, ex.unidades), hist = P.d.examenes.historial.filter(x => x.rango === ex.rango);
+    const suspendido = hist.length > 0 && !hist[hist.length - 1].aprobado;
     const pr = W.proyectoDe(ex.rango), hechos = ex.proyecto;
     const proyectoT = pr ? h('section', { class: 'tarjeta proyecto-tarjeta' + (ex.proyectoHecho ? ' hecho' : '') },
       h('div', { class: 'entre' }, h('span', { class: 'etiqueta' }, 'Requisito: el proyecto del rango'), h('span', { class: 'insignia ' + (ex.proyectoHecho ? 'bien' : 'kihada') }, ex.proyectoHecho ? 'Terminado' : `${hechos} de ${N.PASOS_PROYECTO} pasos`)),
@@ -239,20 +245,32 @@ raiz.VistaExamen = function (ctx) {
       : !ex.proyectoHecho && !ex.repaso && rg.i === P.d.rangoMax ? h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Antes del examen, termina el proyecto «${pr ? pr.titulo : ''}» (abajo).${ex.espera ? ` Y te faltan ${U.miles(ex.espera)} puntos.` : ''}`)
       : rg.i < P.d.rangoMax ? h('p', { class: 'insignia mal', style: 'white-space:normal' }, `Primero recupera tu rango: te faltan ${U.miles(N.RANGOS[P.d.rangoMax].min - P.d.puntos)} puntos.`)
       : ex.repaso ? h('div', { class: 'pila' }, h('p', { class: 'insignia mal', style: 'white-space:normal' }, `Suspendiste: primero repasa las ${ex.repaso} ${ex.repaso === 1 ? 'pregunta que fallaste' : 'preguntas que fallaste'}${ex.espera ? ` y recupera ${U.miles(ex.espera)} puntos` : ''}.`), h('div', { class: 'fila' }, h('button', { class: 'btn primario', id: 'ex-repasar', onclick: empiezaRepaso }, 'Repasar lo que fallé')))
-      : ex.espera && ex.objetivo > ex.min ? h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Repaso hecho. Vuelve a tus ${U.miles(ex.objetivo)} puntos para repetirlo: te faltan ${U.miles(ex.espera)}.`)
-      : h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `Se abre con ${U.miles(ex.min)} puntos: te faltan ${U.miles(ex.espera)}.`);
+      : ex.espera ? h('p', { class: 'insignia kihada', style: 'white-space:normal' }, `${suspendido ? 'Repaso hecho. Vuelve a llenar' : 'Llena'} las tres partes (${U.miles(ex.objetivo)} puntos): te faltan ${U.miles(ex.espera)}. Abajo ves cuánto lleva cada una.`)
+      : h('p', { class: 'insignia kihada', style: 'white-space:normal' }, 'Ya tienes los puntos. Mira abajo lo que te falta: el examen se abre con el proyecto hecho y todo lo que entra dominado.');
+    // Requisitos: puntos de cada parte, el proyecto y lo que entra, dominado
+    const ar = ex.areas, filaReq = (ok, titulo, detalle, boton) => h('li', { class: ok ? 'si' : 'no' }, h('span', { class: 'pila' }, h('b', null, (ok ? '✓ ' : '✗ ') + titulo), detalle ? h('span', { class: 'tenue' }, detalle) : null), boton || null);
+    const requisitosT = h('section', { class: 'tarjeta', id: 'ex-requisitos' }, h('h2', null, 'Lo que hace falta para el examen'),
+      h('p', { class: 'tenue' }, `Los ${U.miles(ex.min - N.RANGOS[ex.rango - 1].min)} puntos de este rango se reparten entre las tres partes: cada una da los suyos y ahí se para. Así no se puede llegar al examen con una sola.`),
+      h('span', { class: 'etiqueta' }, 'Puntos de cada parte'),
+      h('ul', { class: 'requisitos' }, ...(ar ? N.AREAS.map(a => filaReq(ar[a].lleno, `${ar[a].nombre}: ${U.miles(Math.max(0, ar[a].tiene))} de ${U.miles(ar[a].tope)}`,
+        ar[a].lleno ? 'Completa' : a === 'codigo' && ar.codigo.reserva ? `${U.miles(ar.codigo.reserva)} de estos puntos solo los da el proyecto` : `Te faltan ${U.miles(ar[a].tope - Math.max(0, ar[a].tiene))}`)) : []),
+        pr ? filaReq(ex.proyectoHecho, `Proyecto «${pr.titulo}»`, ex.proyectoHecho ? 'Terminado' : `${ex.proyecto} de ${N.PASOS_PROYECTO} pasos (abajo)`) : null),
+      h('span', { class: 'etiqueta' }, 'Lo que entra, dominado'),
+      ex.faltan.length ? h('ul', { class: 'requisitos', id: 'ex-faltan' }, ...ex.faltan.map(f => filaReq(false, `${N.NOMBRE_AREA[f.area]} · ${f.titulo}`, f.falta, h('button', { class: 'btn chico', onclick: () => practica(f) }, 'Practicar'))))
+        : h('p', null, h('span', { class: 'insignia bien' }, '✓ Dominas todo lo que entra')));
     return h('div', { class: 'columna' },
       h('section', { class: 'tarjeta examen-intro' },
         h('div', { class: 'cabeza-rango' }, U.emblema(ex.rango, 58, ex.nombre), h('div', { class: 'pila', style: 'gap:2px' }, h('span', { class: 'etiqueta' }, `Examen de ascenso · rango ${ex.rango + 1} de ${N.RANGOS.length}`), h('h1', null, ex.nombre), h('span', { class: 'tenue' }, N.RANGOS[ex.rango].lema))),
         h('ul', { class: 'lista' },
           h('li', null, h('b', null, `${ex.preguntas} preguntas`), ` mezcladas: código (leer y escribir, en PSeInt, Python y C++), inglés y habla de programador.`),
           h('li', null, h('b', null, 'Escribir de verdad: '), `${ex.rango <= 2 ? 'un programa' : 'dos programas'} desde cero y alguna línea que falta, sin autocompletar ni pistas: como si fuera en papel o en el bloc de notas.`),
-          h('li', null, h('b', null, `Para aprobar: el ${Math.round(ex.nota * 100)} %`), ` (${Math.ceil(ex.preguntas * ex.nota)} bien como mínimo).`),
+          h('li', null, h('b', null, `Para aprobar: el ${Math.round(ex.nota * 100)} % en cada parte`), ` (código, inglés y habla por separado; ${Math.ceil(ex.preguntas * ex.nota)} bien como mínimo en total). Una parte floja no se compensa con otra.`),
           h('li', null, h('b', null, 'Sin ninguna ayuda: '), 'ni tutor, ni pistas, ni pronunciación escrita, ni paso a paso. No sabrás si aciertas hasta el final.'),
           h('li', null, h('b', null, 'Sin salir: '), 'si cambias de pantalla o cierras la app, cuenta como suspendido.'),
           h('li', null, h('b', null, `Si suspendes, pierdes ${U.miles(ex.multa)} puntos`), ', repasas lo que fallaste y, cuando recuperes los puntos, lo repites. Aprobar da +' + N.PUNTOS.examen + ' puntos.')),
         h('div', { class: 'ajuste' }, h('span', { class: 'etiqueta' }, 'Lenguaje en el que escribirás'), chipsLang(langEscribir(), l => { st.langEsc = l; ls.set('lang-escribir', l); pinta(); }, 'Lenguaje para escribir en el examen')),
         estado),
+      ex.disponible ? null : requisitosT,
       proyectoT,
       h('section', { class: 'tarjeta' }, h('h2', null, `Lo que debe saber un ${ex.nombre}`), h('ul', { class: 'lista sabe' }, ...ex.sabe.map(x => h('li', null, x)))),
       h('section', { class: 'tarjeta' }, h('h2', null, 'Lo que entra'),
@@ -273,7 +291,7 @@ raiz.VistaExamen = function (ctx) {
     const r = N.registraPaso(P.d, st.k, x.paso, c.ok);
     x.res = Object.assign(c, { reg: r }); if (!c.ok) x.fallos++;
     // primero se celebra el proyecto; el aviso de «examen disponible» espera su turno detrás
-    if (r.terminado && c.ok) U.celebra(0, `+${N.PUNTOS.paso + N.PUNTOS.proyecto} puntos. Lo escribiste tú, paso a paso.${N.estadoExamen(P.d).disponible ? ' Ya puedes hacer el examen.' : ''}`, { figura: h('span', { class: 'sello-en grande', 'aria-hidden': 'true' }, '{ }'), etiqueta: 'Proyecto terminado', titulo: pr.titulo });
+    if (r.terminado && c.ok) U.celebra(0, `${r.puntos > 0 ? `+${r.puntos} puntos. ` : ''}Lo escribiste tú, paso a paso.${N.estadoExamen(P.d).disponible ? ' Ya puedes hacer el examen.' : ''}`, { figura: h('span', { class: 'sello-en grande', 'aria-hidden': 'true' }, '{ }'), etiqueta: 'Proyecto terminado', titulo: pr.titulo });
     trataPuntos(r, c.ok);
     pinta();
   }
