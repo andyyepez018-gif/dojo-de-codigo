@@ -119,6 +119,9 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   { const t = await p.locator('.traza .salida').last().textContent(); ok('PSeInt paso a paso: al final solo lo de después de borrar', /456/.test(t) && !/antes/.test(t), t); }
   await p.getByRole('button', { name: '← Volver al editor' }).click(); await p.waitForSelector('#editor-codigo');
 
+  // en PSeInt los tipos también valen como nombre de variable: azul solo después de «Como»
+  { const c = await p.evaluate(() => ['Definir numero Como Entero', 'Leer texto'].map(l => UI.piezas(l, 'ps').filter(x => x.t.trim()).map(x => x.c).join(' ')));
+    ok('«numero» o «texto» como variable no salen como palabra clave', c[0] === 'kw var kw kw' && c[1] === 'kw var', c); }
   // el cuadro crece con el código: la capa donde se escribe y la de colores nunca se separan
   await p.fill('#editor-codigo', Array.from({ length: 30 }, (_, i) => 'Escribir "línea ' + (i + 1) + '"').join('\n'));
   await p.locator('#editor-codigo').press('Control+End'); await pausa(150);

@@ -57,17 +57,23 @@ const RE = {
 };
 /* Trocea una línea en piezas con su categoría: com (comentario), dir (#include), str (texto), nu (número),
    ctl (palabra de control), kw (otra palabra clave), fn (función), var (variable) o '' (lo demás: signos, espacios) */
+/* En PSeInt los tipos (Entero, Numero, Texto…) también valen como nombre de variable: «Definir numero Como
+   Entero». Son palabra clave solo justo después de «Como»; en cualquier otro sitio, son una variable. */
+const TIPOS_PS = new Set('entero real caracter cadena texto logico numero numerico'.split(' '));
 function piezas(linea, lang) {
-  const re = new RegExp((lang === 'py' ? RE.py : RE.otro).source, 'g'), out = []; let ult = 0, m;
+  const re = new RegExp((lang === 'py' ? RE.py : RE.otro).source, 'g'), out = []; let ult = 0, m, previa = '';
   const mas = (t, c) => { if (t) out.push({ t, c }); };
   while ((m = re.exec(linea))) {
     mas(linea.slice(ult, m.index), ''); ult = re.lastIndex;
+    if (m[1] || m[2] || m[3]) previa = '';
     if (m[1]) mas(m[1], m[1].trimStart().startsWith('#') && lang !== 'py' ? 'dir' : 'com');
     else if (m[2]) mas(m[2], 'str');
     else if (m[3]) mas(m[3], 'nu');
     else if (m[4]) {
       const w = m[4], k = lang === 'ps' ? normaliza(w) : w;
-      mas(w, CTL[lang] && CTL[lang].has(k) ? 'ctl' : KW[lang] && KW[lang].has(k) ? 'kw' : (FN[lang] && FN[lang].has(k)) || /^\s*\(/.test(linea.slice(ult)) ? 'fn' : 'var');
+      if (lang === 'ps' && TIPOS_PS.has(k)) mas(w, previa === 'como' ? 'kw' : 'var');
+      else mas(w, CTL[lang] && CTL[lang].has(k) ? 'ctl' : KW[lang] && KW[lang].has(k) ? 'kw' : (FN[lang] && FN[lang].has(k)) || /^\s*\(/.test(linea.slice(ult)) ? 'fn' : 'var');
+      previa = k;
     }
     if (m[0] === '') re.lastIndex++;
   }
