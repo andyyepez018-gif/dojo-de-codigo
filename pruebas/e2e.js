@@ -541,6 +541,9 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.fill('#est-mat-pares', ejPares.sol); await p.locator('#ej-mat-pares').getByRole('button', { name: 'Comprobar' }).click();
   ok('rúbrica: la solución completa da 5.0 / 5.0', /5\.0 \/ 5\.0/.test(await p.textContent('#ej-mat-pares')) && /Funciona y cumple la rúbrica/.test(await p.textContent('#ej-mat-pares')));
   await p.screenshot({ path: path.join(CAPTURAS, '31-estudio-matrices.png'), fullPage: false });
+  { const boton = p.locator('#ej-mat-notas').getByRole('button', { name: 'Ver una solución' }); await boton.scrollIntoViewIfNeeded(); await p.mouse.wheel(0, 120); await pausa(200);
+    const antes = await p.evaluate(() => scrollY); await boton.click(); await pausa(300); const despues = await p.evaluate(() => scrollY);
+    ok('pulsar un botón de la guía no te lleva al inicio de la página', antes > 500 && Math.abs(antes - despues) < 5, [antes, despues]); }
   await p.selectOption('#cap-ir', '0'); await p.waitForSelector('.objetivo');
   const t = W.tareas.find(x => x.tema === 'salida');
   await p.fill('#est-' + t.id, t.sol.ps); await p.locator('.practica-estudio').first().getByRole('button', { name: 'Comprobar' }).click();
