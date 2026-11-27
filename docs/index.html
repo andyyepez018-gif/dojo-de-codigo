@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https://*.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Dojo de código</title>
 <meta name="description" content="Retos de 30 segundos de PSeInt, Python y C++, inglés para programar desde cero (escucharlo y hablarlo), diez rangos de Aprendiz a Ingeniero de élite y un laboratorio que ejecuta código paso a paso.">
@@ -128,6 +128,22 @@ a { color: var(--ai); }
 .requisitos li { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .requisitos li .pila { gap: 1px; }
 .requisitos li.si b { color: var(--bien); } .requisitos li.no b { color: var(--mal); }
+.capa-acceso { position: fixed; inset: 0; z-index: 60; background: var(--papel); overflow-y: auto; display: grid; place-items: start center; padding: max(24px, env(safe-area-inset-top)) 16px 32px; }
+.acceso-tarjeta { width: 100%; max-width: 460px; display: grid; gap: 12px; margin-top: 4vh; }
+.acceso-tarjeta .marca { display: flex; align-items: center; gap: 10px; }
+.acceso-tarjeta .marca small { display: block; color: var(--tinta-2); }
+.acceso-tarjeta h1 { margin: 4px 0 0; }
+.acceso-tarjeta input.campo { width: 100%; font-size: 16px; }
+.acceso-tarjeta .ajuste { display: grid; gap: 4px; }
+.error-acceso { margin: 0; color: var(--mal); font-weight: 500; min-height: 1.2em; }
+.error-acceso.bien { color: var(--bien); }
+.error-acceso:empty { display: none; }
+.acepta-datos { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; }
+.acepta-datos input { width: 20px; height: 20px; margin-top: 1px; flex: none; }
+.aviso-datos p { font-size: 13.5px; color: var(--tinta-2); }
+.datos-cuenta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+.datos-cuenta dt { color: var(--tinta-2); } .datos-cuenta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.sesion-pie b { color: var(--tinta); }
 .personal-acceso, .armar-acceso { border-color: var(--ai); }
 .metodo-armar { display: grid; gap: 10px; padding-left: 22px; margin: 0; }
 .metodo-armar > li { display: grid; gap: 4px; }
@@ -597,6 +613,7 @@ details.desplegable[open] { display: grid; gap: 14px; }
 <script src="ingles.js"></script>
 <script src="habla.js"></script>
 <script src="nucleo.js"></script>
+<script src="cuenta.js"></script>
 <script src="ui.js"></script>
 <script src="ejecutor.js"></script>
 <script src="voz.js"></script>

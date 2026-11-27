@@ -8,12 +8,15 @@ const { $, h, ls, mmss, NL, aviso, bloqueCodigo, salidaBloque, cinturon, CINTURO
 const LANGS = N.LANGS, VERSION = N.VERSION;
 const URL_APP = 'https://andyyepez018-gif.github.io/dojo-de-codigo/';
 const enClaude = !!(window.claude && window.claude.use);
+/* Cuentas de los aprendices (Supabase): solo en la app instalable; en Claude ya los identifica su cuenta */
+const C = window.Cuenta, conCuentas = !enClaude && !!C && C.activa();
 document.documentElement.lang = 'es';
 
 /* ───────────── Progreso: en la cuenta (versión de Claude) o en este dispositivo ───────────── */
 const P = {
-  d: N.normaliza(ls.get('progreso', null), D, I, J), ref: null, escribiendo: false, otraVez: false, t: null, enCuenta: false,
+  d: N.normaliza(ls.get('progreso', null), D, I, J), ref: null, escribiendo: false, otraVez: false, t: null, enCuenta: false, enNube: false, pendiente: false,
   async iniciar() {
+    if (conCuentas) { if (C.sesion()) await this.cargaNube(); else muestraAcceso(); return; }
     try {
       if (!enClaude) return;
       const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
@@ -31,7 +34,36 @@ const P = {
     } catch (e) { this.ref = null; }
   },
   cambio() { this.d.actualizado = Date.now(); ls.set('progreso', this.d); clearTimeout(this.t); this.t = setTimeout(() => { this.t = null; this.guardar(); }, 2000); },
+  /* Al entrar con la cuenta: el progreso de la base de datos manda; el de este aparato solo si es suyo y más nuevo */
+  async cargaNube(pasarLocal) {
+    const s = C.sesion(); if (!s) { muestraAcceso(); return; }
+    const dueno = ls.get('progreso-de', null), local = this.d, mio = dueno === s.user.id;
+    if (!mio && dueno) this.d = N.NUEVO();   // en este aparato hay progreso de otra persona: no se mezcla
+    try {
+      const r = await C.leeProgreso();
+      if (r && r.datos && Object.keys(r.datos).length) {
+        const remoto = N.normaliza(r.datos, D, I, J);
+        this.d = mio && local.actualizado > remoto.actualizado ? local : remoto;
+      } else if (!dueno && pasarLocal) this.d = local;
+      else if (!mio) { this.d = N.NUEVO(); this.d.bienvenida = true; }
+      this.enNube = true; ls.set('progreso-de', s.user.id); ls.set('progreso', this.d);
+      if (!r || this.d === local) await this.guardar();
+    } catch (e) {
+      if (e && e.codigo === 'sin_sesion') { await saleCuenta(true); return; }
+      this.enNube = true; this.pendiente = true; if (!mio) { this.d = N.NUEVO(); this.d.bienvenida = true; }
+      ls.set('progreso-de', s.user.id); aviso('Sin conexión: tu progreso se guarda aquí y se sube cuando vuelva internet.', 5000);
+    }
+    reto = null; repintar(); pintaPie();
+  },
   async guardar() {
+    if (this.enNube) {
+      if (this.escribiendo) { this.otraVez = true; return; }
+      this.escribiendo = true;
+      try { await C.guardaProgreso(JSON.parse(JSON.stringify(this.d))); this.pendiente = false; }
+      catch (e) { this.pendiente = true; if (e && e.codigo === 'sin_sesion') { this.escribiendo = false; await saleCuenta(true); return; } }
+      finally { this.escribiendo = false; if (this.otraVez) { this.otraVez = false; this.guardar(); } }
+      return;
+    }
     if (!this.ref) return;
     if (this.escribiendo) { this.otraVez = true; return; }
     this.escribiendo = true;
@@ -44,7 +76,93 @@ const P = {
 const est = id => N.estadoTema(P.d, D, id);
 const temaActual = () => N.temaActual(P.d, D);
 const dominados = () => N.dominados(P.d, D);
-function pintaPie() { const el = $('#pie-lateral'); if (el) el.textContent = (P.enCuenta ? 'Tu progreso se guarda en tu cuenta: es el mismo en el PC y en el móvil.' : 'Tu progreso se guarda en este dispositivo.') + ' Versión ' + VERSION + '.'; }
+function pintaPie() {
+  const el = $('#pie-lateral'); if (!el) return; el.textContent = '';
+  const s = conCuentas && C.sesion();
+  if (s && P.enNube) el.append(h('span', { class: 'sesion-pie' }, h('b', null, s.user.nombre || s.user.email), s.user.ficha ? ` · ficha ${s.user.ficha}` : ''), h('br'), 'Tu progreso se guarda en tu cuenta. ', h('button', { class: 'btn plano chico', id: 'cerrar-sesion', onclick: () => saleCuenta() }, 'Cerrar sesión'), h('br'));
+  else el.append(P.enCuenta ? 'Tu progreso se guarda en tu cuenta: es el mismo en el PC y en el móvil.' : 'Tu progreso se guarda en este dispositivo.');
+  el.append(' Versión ' + VERSION + '.');
+}
+/* ── Entrar o crear la cuenta (correo, contraseña, nombre y ficha del SENA) ── */
+function muestraAcceso(modo = 'entrar', mensaje = '') {
+  let capa = $('#acceso'); if (capa) capa.remove();
+  document.querySelectorAll('body > .app, body > .aviso').forEach(x => { x.inert = true; });
+  const error = h('p', { class: 'error-acceso', role: 'alert' }, mensaje);
+  const campo = (id, etiqueta, o) => h('label', { class: 'ajuste', for: id }, h('span', null, etiqueta), h('input', Object.assign({ class: 'campo', id, name: id, required: true }, o)));
+  const enviar = async (form, boton, accion) => {
+    error.textContent = ''; error.classList.remove('bien'); boton.disabled = true; const texto = boton.textContent; boton.textContent = 'Un momento…';
+    try { await accion(new FormData(form)); }
+    catch (e) { error.textContent = e && e.message ? e.message : 'Algo falló. Vuelve a intentarlo.'; }
+    finally { if (boton.isConnected) { boton.disabled = false; boton.textContent = texto; } }
+  };
+  const tabs = h('div', { class: 'chips acceso-tabs', role: 'tablist' },
+    h('button', { class: 'chip', role: 'tab', 'aria-selected': String(modo === 'entrar'), onclick: () => muestraAcceso('entrar') }, 'Entrar'),
+    h('button', { class: 'chip', role: 'tab', 'aria-selected': String(modo === 'registro'), onclick: () => muestraAcceso('registro') }, 'Crear cuenta'));
+  let form;
+  if (modo === 'entrar') {
+    const b = h('button', { class: 'btn primario grande', type: 'submit', id: 'acceso-entrar' }, 'Entrar');
+    form = h('form', { class: 'pila', novalidate: true, onsubmit: e => { e.preventDefault(); enviar(form, b, async f => { await C.entra({ correo: f.get('acceso-correo'), clave: f.get('acceso-clave') }); await entraCuenta(); }); } },
+      campo('acceso-correo', 'Correo', { type: 'email', autocomplete: 'email', inputmode: 'email' }), campo('acceso-clave', 'Contraseña', { type: 'password', autocomplete: 'current-password' }), error, b,
+      h('p', { class: 'tenue', style: 'font-size:13.5px' }, '¿Es tu primera vez? ', h('button', { class: 'btn plano chico', type: 'button', onclick: () => muestraAcceso('registro') }, 'Crea tu cuenta')));
+  } else {
+    const b = h('button', { class: 'btn primario grande', type: 'submit', id: 'acceso-crear' }, 'Crear mi cuenta');
+    const acepta = h('input', { type: 'checkbox', id: 'acceso-acepta', name: 'acceso-acepta' });
+    form = h('form', { class: 'pila', novalidate: true, onsubmit: e => { e.preventDefault(); enviar(form, b, async f => {
+      const r = await C.registra({ nombre: f.get('acceso-nombre'), correo: f.get('acceso-correo'), ficha: f.get('acceso-ficha'), clave: f.get('acceso-clave'), clave2: f.get('acceso-clave2'), acepta: acepta.checked });
+      if (r.confirmar) { muestraAcceso('entrar', 'Cuenta creada. Te enviamos un correo para confirmarla: ábrelo (mira también en spam) y luego entra aquí.'); $('#acceso .error-acceso').classList.add('bien'); return; }
+      await entraCuenta(true);
+    }); } },
+      campo('acceso-nombre', 'Nombre y apellido', { type: 'text', autocomplete: 'name', maxlength: '80' }),
+      campo('acceso-correo', 'Correo', { type: 'email', autocomplete: 'email', inputmode: 'email' }),
+      campo('acceso-ficha', 'Ficha del SENA', { type: 'text', inputmode: 'numeric', autocomplete: 'off', pattern: '[0-9]*', maxlength: '10', placeholder: 'Solo números, por ejemplo 2834567' }),
+      campo('acceso-clave', 'Contraseña (mínimo 8, con letras y números)', { type: 'password', autocomplete: 'new-password', minlength: '8' }),
+      campo('acceso-clave2', 'Repite la contraseña', { type: 'password', autocomplete: 'new-password', minlength: '8' }),
+      h('label', { class: 'acepta-datos', for: 'acceso-acepta' }, acepta, h('span', null, 'Acepto el tratamiento de mis datos personales según el aviso de abajo.')),
+      h('details', { class: 'desplegable aviso-datos' }, h('summary', null, 'Aviso de tratamiento de datos'),
+        h('p', null, 'El Dojo de código guarda tu nombre, tu correo, tu número de ficha del SENA y tu progreso en la app (puntos, rango, ejercicios) en una base de datos de Supabase. Se usan solo para que entres con tu cuenta y no pierdas tu avance desde ningún aparato. Tu contraseña la guarda Supabase cifrada: nadie puede leerla, ni siquiera quien administra el Dojo.'),
+        h('p', null, 'Tus datos no se venden ni se comparten con nadie, y nadie más que tú puede ver tu progreso. Puedes conocerlos, corregirlos o borrarlos cuando quieras: en Plan → «Tu cuenta» está el botón para borrar tu cuenta y todos tus datos (Ley 1581 de 2012 de protección de datos personales).')),
+      error, b);
+  }
+  capa = h('div', { id: 'acceso', class: 'capa-acceso', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'acceso-t' },
+    h('section', { class: 'tarjeta acceso-tarjeta' },
+      h('div', { class: 'marca' }, h('span', { class: 'sello', 'aria-hidden': 'true' }, '道'), h('span', null, h('b', null, 'Dojo de código'), h('small', null, 'Código · Inglés · Habla'))),
+      h('h1', { id: 'acceso-t' }, modo === 'entrar' ? 'Entra con tu cuenta' : 'Crea tu cuenta'),
+      h('p', { class: 'tenue' }, modo === 'entrar' ? 'Tu progreso se guarda en tu cuenta: entra desde cualquier PC o celular y sigue donde ibas.' : 'Solo una vez. Con tu cuenta, tu progreso queda guardado aunque cambies de aparato.'),
+      tabs, form));
+  document.body.append(capa);
+  const primero = capa.querySelector('input'); if (primero) primero.focus();
+}
+function quitaAcceso() { const c = $('#acceso'); if (c) c.remove(); document.querySelectorAll('body > .app, body > .aviso').forEach(x => { x.inert = false; }); }
+/* Tras entrar o registrarse: si este aparato tenía progreso sin cuenta, se ofrece pasarlo */
+async function entraCuenta(nueva) {
+  const s = C.sesion(); if (!s) return;
+  const dueno = ls.get('progreso-de', null), local = P.d, hayLocal = !dueno && (local.puntos > 0 || Object.keys(local.dias).length > 0);
+  let pasar = false;
+  if (hayLocal) {
+    let r; try { r = await C.leeProgreso(); } catch (e) { r = null; }
+    if (!r || !r.datos || !Object.keys(r.datos).length) pasar = await preguntaPasar(local);
+  }
+  quitaAcceso(); await P.cargaNube(pasar);
+  aviso(`${nueva ? 'Cuenta creada. ' : ''}Hola, ${(s.user.nombre || '').split(' ')[0] || 'de nuevo'}.`, 4000);
+}
+function preguntaPasar(local) {
+  return new Promise(res => {
+    const form = $('#acceso form'); if (!form) { res(false); return; }
+    const caja = h('div', { class: 'pila pasar-progreso', role: 'group', 'aria-label': 'Progreso de este aparato' },
+      h('p', null, h('b', null, `En este aparato hay progreso sin cuenta (${U.miles(local.puntos)} puntos). `), '¿Es tuyo? Puedes pasarlo a tu cuenta o empezar de cero.'),
+      h('div', { class: 'fila' }, h('button', { class: 'btn primario', type: 'button', id: 'pasar-si', onclick: () => res(true) }, 'Es mío: pasarlo a mi cuenta'), h('button', { class: 'btn', type: 'button', id: 'pasar-no', onclick: () => res(false) }, 'Empezar de cero')));
+    form.replaceWith(caja);
+  });
+}
+/* Cerrar sesión: el progreso se queda en la cuenta y se borra de este aparato (puede ser un PC compartido) */
+async function saleCuenta(caducada) {
+  if (!caducada && P.enNube) { clearTimeout(P.t); P.t = null; try { await P.guardar(); } catch (e) { /* lo que no se subió se pierde de este aparato */ } }
+  await C.sale();
+  ls.set('progreso', null); ls.set('progreso-de', null); P.enNube = false; P.pendiente = false;
+  P.d = N.NUEVO(); reto = null; repintar(); pintaPie();
+  muestraAcceso('entrar', caducada ? 'Tu sesión caducó: vuelve a entrar.' : '');
+}
+window.addEventListener('online', () => { if (P.enNube && P.pendiente) P.guardar(); });
 
 /* ───────────── App instalable y actualizable (fuera de Claude) ───────────── */
 const instalada = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
@@ -1119,7 +1237,7 @@ PINTA.plan = function () {
         selector('aj-tema-codigo', 'Colores del código', aj.temaCodigo, [['dojo', 'Los del Dojo'], ['vscode', 'Como VS Code (oscuro)']], v => { aj.temaCodigo = v; P.cambio(); aplicaTemaCodigo(); }),
         selector('aj-aspecto', 'Aspecto', aj.aspecto, [['sistema', 'Como el sistema'], ['claro', 'Claro'], ['oscuro', 'Oscuro']], v => { aj.aspecto = v; P.cambio(); U.aplicaAspecto(v); }),
         selector('aj-vibrar', 'Vibrar al responder', aj.vibrar ? 'si' : 'no', [['si', 'Sí'], ['no', 'No']], v => { aj.vibrar = v === 'si'; P.cambio(); U.vibra(18, aj.vibrar); }))),
-    tarjetaApp(), tarjetaCopia(), tarjetaPrivacidad()));
+    tarjetaCuenta(), tarjetaApp(), tarjetaCopia(), tarjetaPrivacidad()));
 };
 /* ───────────── Recordatorio diario (un evento del calendario que se repite) e insignia del icono ───────────── */
 const dos = n => String(n).padStart(2, '0');
@@ -1194,13 +1312,28 @@ function tarjetaCopia() {
       if (await U.copia(c)) aviso('Código copiado. Pégalo en el otro dispositivo.'); else { salida.hidden = false; salida.focus(); salida.select(); aviso('Selecciona el código y cópialo.'); }
     } }, 'Copiar mi progreso')), salida, entrada, h('div', { class: 'fila' }, cargar));
 }
+let borrarCuentaArmado = false;
+function tarjetaCuenta() {
+  if (!conCuentas || !P.enNube) return null;
+  const s = C.sesion(); if (!s) return null;
+  const borrar = h('button', { class: 'btn peligro-suave', id: 'borrar-cuenta', onclick: async () => {
+    if (!borrarCuentaArmado) { borrarCuentaArmado = true; borrar.textContent = 'Se borran tu cuenta, tus datos y tu progreso para siempre. Toca otra vez'; setTimeout(() => { if (borrar.isConnected) { borrarCuentaArmado = false; borrar.textContent = 'Borrar mi cuenta'; } }, 4000); return; }
+    borrarCuentaArmado = false; borrar.disabled = true;
+    try { await C.borraCuenta(); ls.set('progreso', null); ls.set('progreso-de', null); P.enNube = false; P.d = N.NUEVO(); repintar(); pintaPie(); muestraAcceso('registro', ''); aviso('Tu cuenta y todos tus datos se borraron.', 5000); }
+    catch (e) { borrar.disabled = false; aviso(e && e.message ? e.message : 'No se pudo borrar la cuenta.', 5000); }
+  } }, 'Borrar mi cuenta');
+  return h('section', { class: 'tarjeta', id: 'tu-cuenta' }, h('h2', null, 'Tu cuenta'),
+    h('dl', { class: 'datos-cuenta' }, h('dt', null, 'Nombre'), h('dd', null, s.user.nombre || '—'), h('dt', null, 'Correo'), h('dd', null, s.user.email), h('dt', null, 'Ficha del SENA'), h('dd', null, s.user.ficha || '—')),
+    h('p', { class: 'tenue' }, P.pendiente ? 'Hay cambios sin subir (sin conexión): se suben solos cuando vuelva internet.' : 'Tu progreso está guardado en tu cuenta. Entra desde cualquier aparato con tu correo y tu contraseña.'),
+    h('div', { class: 'fila' }, h('button', { class: 'btn', onclick: () => saleCuenta() }, 'Cerrar sesión'), borrar));
+}
 function tarjetaPrivacidad() {
   const borrar = h('button', { class: 'btn peligro-suave', onclick: () => {
     if (!borrarArmado) { borrarArmado = true; borrar.textContent = 'Se borra todo y no se puede deshacer. Toca otra vez'; setTimeout(() => { if (borrar.isConnected) { borrarArmado = false; borrar.textContent = 'Borrar mi progreso'; } }, 4000); return; }
     borrarArmado = false; const n = N.NUEVO(); n.bienvenida = false; P.sustituye(n); reto = null; colaSesion.length = 0; VI.inicio(); repintar(); ir('hoy'); aviso('Progreso borrado. Empiezas de cero.');
   } }, 'Borrar mi progreso');
   return h('section', { class: 'tarjeta' }, h('h2', null, 'Tus datos'),
-    h('p', { class: 'tenue' }, enClaude ? 'Tu progreso se guarda en tu cuenta de Claude, en un espacio privado que solo tú puedes leer.' : 'Tu progreso se guarda solo en este dispositivo. La app no tiene anuncios, no envía datos a ningún servidor y no usa rastreadores.'),
+    h('p', { class: 'tenue' }, enClaude ? 'Tu progreso se guarda en tu cuenta de Claude, en un espacio privado que solo tú puedes leer.' : P.enNube ? 'Tu nombre, tu correo, tu ficha y tu progreso se guardan en tu cuenta (en Supabase); solo tú puedes verlos y puedes borrarlos con «Borrar mi cuenta». La app no tiene anuncios ni rastreadores.' : 'Tu progreso se guarda solo en este dispositivo. La app no tiene anuncios, no envía datos a ningún servidor y no usa rastreadores.'),
     h('p', { class: 'tenue' }, enClaude ? 'La voz y el dictado de los ejercicios de inglés los pone Claude; tu voz no se guarda en el Dojo.' : 'Si usas el micrófono en inglés, quien convierte tu voz en texto es el navegador (en Chrome y Edge, con los servidores de Google o de Microsoft). El Dojo solo recibe el texto y no lo guarda.'),
     h('p', { class: 'tenue' }, 'El código que escribes en el laboratorio se ejecuta aquí mismo, en tu dispositivo.'),
     h('div', { class: 'fila' }, borrar));

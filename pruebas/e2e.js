@@ -607,6 +607,67 @@ const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = requir
   await p.screenshot({ path: path.join(CAPTURAS, '31-estudio-lab.png') });
   await c.close();
 
+  console.log('19. Cuentas de los aprendices (con un Supabase de mentira)');
+  { const { supabaseFalso } = require('./supabase-falso.js');
+    c = await b.newContext({ viewport: { width: 1280, height: 900 } }); const sb = await supabaseFalso(c);
+    // (aquí el navegador avisa solo de las respuestas 400 de la contraseña mal y del «sin internet» simulado: son esperadas)
+    p = await c.newPage(); p.on('pageerror', e => errores.push('pageerror: ' + e.message)); p.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) errores.push('consola: ' + m.text()); });
+    await p.goto(URL + '#hoy'); await p.waitForSelector('#acceso');
+    ok('con cuentas activadas, primero hay que entrar (y la app de detrás no se puede tocar)', await p.locator('#acceso h1').textContent() === 'Entra con tu cuenta' && await p.evaluate(() => document.querySelector('.app').inert === true));
+    await p.screenshot({ path: path.join(CAPTURAS, '34-entrar.png') });
+    await p.getByRole('tab', { name: 'Crear cuenta' }).click(); await p.waitForSelector('#acceso-ficha');
+    const rellena = async (o) => { for (const [k, v] of Object.entries(o)) await p.fill('#acceso-' + k, v); };
+    await rellena({ nombre: 'Ana Pérez', correo: 'ana@correo.com', ficha: 'abc', clave: 'clave1234', clave2: 'clave1234' }); await p.click('#acceso-crear');
+    ok('registro: la ficha tiene que ser solo números', /ficha del SENA son solo números/.test(await p.textContent('#acceso .error-acceso')));
+    await rellena({ ficha: '2834567', clave2: 'otra1234' }); await p.click('#acceso-crear');
+    ok('registro: las dos contraseñas tienen que coincidir', /no coinciden/.test(await p.textContent('#acceso .error-acceso')));
+    await rellena({ clave2: 'clave1234' }); await p.click('#acceso-crear');
+    ok('registro: sin aceptar el aviso de datos no se crea', /aceptar el tratamiento/.test(await p.textContent('#acceso .error-acceso')) && sb.usuarios.size === 0);
+    await p.screenshot({ path: path.join(CAPTURAS, '35-registro.png'), fullPage: true });
+    await p.check('#acceso-acepta'); await p.click('#acceso-crear'); await p.waitForSelector('#acceso', { state: 'detached' });
+    const ana = [...sb.usuarios.values()][0];
+    ok('registro: se crea la cuenta con nombre, ficha y el aviso aceptado', ana && ana.email === 'ana@correo.com' && ana.meta.nombre === 'Ana Pérez' && ana.meta.ficha === '2834567' && ana.meta.acepta_datos === true && ana.password === 'clave1234');
+    ok('tras registrarse entra a la app y el menú dice quién es', /Ana Pérez · ficha 2834567/.test(await p.textContent('#pie-lateral')) && await p.evaluate(() => !document.querySelector('.app').inert));
+    await p.goto(URL + '#retos'); await p.waitForSelector('.reto');
+    for (let k = 0; k < 3; k++) { await responderReto(p); await p.waitForSelector('.respuesta'); await cierraFiesta(p); await p.locator('#siguiente').click(); await p.waitForSelector('.reto'); }
+    await pausa(2600);
+    const fila = sb.progreso.get(ana.id);
+    ok('el progreso se guarda en la base de datos de su cuenta', fila && fila.datos.dias && Object.values(fila.datos.dias)[0].retos === 3 && fila.actualizado > 0, fila && fila.datos.dias);
+    await p.goto(URL + '#plan'); await p.waitForSelector('#tu-cuenta');
+    ok('Plan → «Tu cuenta»: nombre, correo y ficha', /Ana Pérez/.test(await p.textContent('#tu-cuenta')) && /ana@correo\.com/.test(await p.textContent('#tu-cuenta')) && /2834567/.test(await p.textContent('#tu-cuenta')));
+    await p.locator('#tu-cuenta').getByRole('button', { name: 'Cerrar sesión' }).click(); await p.waitForSelector('#acceso');
+    ok('cerrar sesión: vuelve a pedir entrar y borra el progreso de este aparato', await p.evaluate(() => localStorage.getItem('dojo-progreso') === null && localStorage.getItem('dojo-sesion') === null));
+    await p.fill('#acceso-correo', 'ana@correo.com'); await p.fill('#acceso-clave', 'mala1234'); await p.click('#acceso-entrar');
+    await p.locator('#acceso .error-acceso', { hasText: /no son correctos/ }).waitFor({ timeout: 5000 }).catch(() => {});
+    ok('entrar con la contraseña mal: lo dice en español', /El correo o la contraseña no son correctos/.test(await p.textContent('#acceso .error-acceso')));
+    await p.fill('#acceso-clave', 'clave1234'); await p.click('#acceso-entrar'); await p.waitForSelector('#acceso', { state: 'detached' });
+    ok('al volver a entrar recupera su progreso de la base de datos', await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('dojo-progreso')).dias)[0].retos === 3));
+    // otra persona en el mismo aparato: no ve el progreso de Ana
+    await p.goto(URL + '#plan'); await p.locator('#tu-cuenta').getByRole('button', { name: 'Cerrar sesión' }).click(); await p.waitForSelector('#acceso');
+    await p.getByRole('tab', { name: 'Crear cuenta' }).click(); await rellena({ nombre: 'Luis Gómez', correo: 'luis@correo.com', ficha: '2834567', clave: 'luis12345', clave2: 'luis12345' }); await p.check('#acceso-acepta'); await p.click('#acceso-crear'); await p.waitForSelector('#acceso', { state: 'detached' });
+    ok('otra persona en el mismo aparato empieza de cero (no se mezclan los progresos)', await p.evaluate(() => { const d = JSON.parse(localStorage.getItem('dojo-progreso')); return d.puntos === 0 && Object.keys(d.dias).length === 0; }) && /Luis Gómez/.test(await p.textContent('#pie-lateral')));
+    await p.getByRole('tab', { name: 'Crear cuenta' }).count();
+    // sin conexión: sigue funcionando y lo sube al volver
+    sb.caerRed = true; await p.goto(URL + '#retos'); await p.waitForSelector('.reto'); await responderReto(p); await p.waitForSelector('.respuesta'); await pausa(2600);
+    sb.caerRed = false; await p.evaluate(() => window.dispatchEvent(new Event('online'))); await pausa(600);
+    const luis = [...sb.usuarios.values()].find(x => x.email === 'luis@correo.com');
+    ok('sin conexión guarda en el aparato y lo sube al volver internet', sb.progreso.get(luis.id) && Object.values(sb.progreso.get(luis.id).datos.dias)[0].retos === 1);
+    // borrar la cuenta
+    await p.goto(URL + '#plan'); await p.waitForSelector('#borrar-cuenta'); await p.click('#borrar-cuenta'); await p.click('#borrar-cuenta'); await p.waitForSelector('#acceso');
+    ok('«Borrar mi cuenta» (con doble confirmación) borra la cuenta y su progreso', !sb.usuarios.has(luis.id) && !sb.progreso.has(luis.id) && sb.usuarios.has(ana.id));
+    await c.close();
+    // un aparato con progreso de antes (sin cuenta): se ofrece pasarlo a la cuenta nueva
+    c = await b.newContext({ viewport: { width: 1280, height: 900 } }); const sb2 = await supabaseFalso(c);
+    await c.addInitScript(() => { if (!localStorage.getItem('dojo-iniciado')) { localStorage.setItem('dojo-progreso', JSON.stringify({ v: 2, bienvenida: true, puntos: 120, examenes: {}, dias: { '2026-11-20': { retos: 12, aciertos: 10, puntos: 120 } } })); localStorage.setItem('dojo-iniciado', '1'); } });
+    p = await c.newPage(); await p.goto(URL + '#hoy'); await p.waitForSelector('#acceso');
+    await p.getByRole('tab', { name: 'Crear cuenta' }).click(); await rellena({ nombre: 'Andrea Ruiz', correo: 'andrea@correo.com', ficha: '3001234', clave: 'andrea123', clave2: 'andrea123' }); await p.check('#acceso-acepta'); await p.click('#acceso-crear');
+    await p.waitForSelector('#pasar-si');
+    ok('con progreso sin cuenta en el aparato, pregunta si es suyo', /120 puntos/.test(await p.textContent('.pasar-progreso')));
+    await p.click('#pasar-si'); await p.waitForSelector('#acceso', { state: 'detached' }); await pausa(400);
+    const andrea = [...sb2.usuarios.values()][0];
+    ok('«Es mío»: el progreso de antes pasa a su cuenta', sb2.progreso.get(andrea.id) && sb2.progreso.get(andrea.id).datos.puntos === 120);
+    await c.close(); }
+
   console.log('10. Móvil (claro y oscuro): nada se sale de la pantalla');
   for (const esquema of ['light', 'dark']) {
     ({ c, p } = await nueva(b, { ...devices['iPhone 13'], colorScheme: esquema }, { v: 2, bienvenida: true }));

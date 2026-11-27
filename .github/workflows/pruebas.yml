@@ -29,6 +29,8 @@ jobs:
         run: node pruebas/estudio.test.js
       - name: Cómo armar un programa (3 lenguajes)
         run: node pruebas/armar.test.js
+      - name: Cuentas de los aprendices (Supabase)
+        run: node pruebas/cuenta.test.js
       - name: Inglés (contenido, comparadores y miles de ejercicios generados)
         run: node pruebas/ingles.test.js
       - name: Habla de programador (términos y situaciones)

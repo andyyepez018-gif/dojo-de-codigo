@@ -56,6 +56,11 @@ const srv = http.createServer((q, r) => {
   await p.locator('#armar-practica .capitulo').first().click(); await p.waitForSelector('#guiado-paso-1');
   await p.locator('#guiado-paso-1').getByRole('button', { name: 'Ayúdame con este paso' }).click(); await p.waitForTimeout(300);
   ok('el guiado pide ayuda a Claude con el ejercicio, el lenguaje y el paso', /Explicación de prueba/.test(await p.textContent('#guiado-paso-1 .tutor')) && await p.evaluate(() => /Promedio|promedio/.test(window.__pregunta) && /C\+\+/.test(window.__pregunta) && /paso: 1/.test(window.__pregunta)));
+  // aunque las cuentas de Supabase estén activadas, dentro de Claude no se pide login: ya lo identifica su cuenta de Claude
+  await p.evaluate(() => { localStorage.setItem('dojo-pruebas', '1'); localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: 'https://prueba-dojo.supabase.co', anon: 'anon-de-prueba-' + 'x'.repeat(40) })); });
+  await p.reload(); await p.waitForTimeout(800);
+  ok('dentro de Claude no aparece la pantalla de entrar', await p.locator('#acceso').count() === 0);
+  await p.evaluate(() => { localStorage.removeItem('dojo-cuenta-config'); });
   await p.goto('http://localhost:8771/#plan');
   ok('el plan enlaza a la app instalable', await p.locator('a[href="https://andyyepez018-gif.github.io/dojo-de-codigo/"]').count() === 1);
   ok('sin errores de JavaScript', errores.length === 0, errores);

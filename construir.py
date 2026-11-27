@@ -11,8 +11,8 @@ import hashlib, json, re, shutil, subprocess, sys, pathlib
 
 raiz = pathlib.Path(__file__).parent
 docs = raiz / 'docs'
-SCRIPTS = ['motor.js', 'contenido.js', 'escribir.js', 'estudio.js', 'personalizado.js', 'armar.js', 'ingles.js', 'habla.js', 'nucleo.js', 'ui.js', 'ejecutor.js', 'trabajador.js', 'voz.js', 'vista-ingles.js', 'vista-habla.js', 'vista-estudio.js', 'vista-examen.js', 'app.js']
-PRUEBAS = ['motor', 'pseint', 'contenido', 'soluciones', 'escribir', 'estudio', 'armar', 'ingles', 'habla', 'nucleo']
+SCRIPTS = ['motor.js', 'contenido.js', 'escribir.js', 'estudio.js', 'personalizado.js', 'armar.js', 'ingles.js', 'habla.js', 'nucleo.js', 'cuenta.js', 'ui.js', 'ejecutor.js', 'trabajador.js', 'voz.js', 'vista-ingles.js', 'vista-habla.js', 'vista-estudio.js', 'vista-examen.js', 'app.js']
+PRUEBAS = ['motor', 'pseint', 'contenido', 'soluciones', 'escribir', 'estudio', 'armar', 'cuenta', 'ingles', 'habla', 'nucleo']
 
 if '--sin-pruebas' not in sys.argv:
     for p in PRUEBAS:
@@ -29,7 +29,7 @@ cuerpo = re.sub(r'<title>.*?</title>\n?', '', pagina)
 cuerpo = re.sub(r'<link [^>]*>\n?', '', cuerpo)
 cuerpo = re.sub(r'<meta name="claude:[^>]*>\n?', '', cuerpo)
 csp = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; "
-       "connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'")
+       "connect-src 'self' https://*.supabase.co; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'")
 cabeza = f'''<!doctype html>
 <html lang="es">
 <head>
