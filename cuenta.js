@@ -8,15 +8,16 @@
 'use strict';
 // Los dos datos públicos del proyecto (Supabase → Project Settings → API). La clave «anon» está hecha
 // para ir en la página: la seguridad la ponen las reglas de la base de datos (cada uno ve solo lo suyo).
-const CONFIG = { url: '', anon: '' };   // anon: la clave «publishable» (sb_publishable_…) o la clásica «anon» (eyJ…)
+const CONFIG = { url: 'https://bfxptwtnsbwgwlchyegp.supabase.co', anon: 'sb_publishable__Tj8uxcA4equKJrFeKpC6g_o2d5vonN' };   // anon: la clave «publishable» (sb_publishable_…) o la clásica «anon» (eyJ…)
 
 const CLAVE_SESION = 'dojo-sesion';
 const lee = k => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
 const guarda = (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } };
 function config() {
   // Solo en las pruebas automáticas se puede usar otro proyecto (uno de mentira)
+  // (con la dirección vacía, las pruebas apagan las cuentas)
   const otra = lee('dojo-pruebas') === 1 ? lee('dojo-cuenta-config') : null;
-  const c = otra && otra.url ? otra : CONFIG;
+  const c = otra && typeof otra === 'object' ? otra : CONFIG;
   return { url: String(c.url || '').replace(/\/+$/, ''), anon: String(c.anon || '') };
 }
 const activa = () => { const c = config(); return /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(c.url) && c.anon.length > 20; };
@@ -33,7 +34,8 @@ const MENSAJES = {
   email_address_invalid: 'Ese correo no es válido.',
   validation_failed: 'Revisa los datos: el correo o la contraseña no son válidos.',
   signup_disabled: 'El registro está cerrado por ahora.',
-  unexpected_failure: 'Supabase no pudo guardar la cuenta. Revisa que el nombre y la ficha sean válidos.'
+  unexpected_failure: 'Supabase no pudo guardar la cuenta. Revisa que el nombre y la ficha sean válidos.',
+  23514: 'Revisa tu nombre y tu ficha: la ficha son solo números (entre 4 y 10 cifras).'
 };
 async function pide(ruta, { metodo = 'GET', cuerpo, token, prefer } = {}) {
   const c = config(); if (!activa()) throw new ErrorCuenta('Las cuentas no están configuradas.', 'sin_config');

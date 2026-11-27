@@ -4,10 +4,12 @@ globalThis.localStorage = { getItem: k => (almacen.has(k) ? almacen.get(k) : nul
 const C = require('../cuenta.js');
 let bien = 0, mal = 0; const ok = (n, c, d) => { if (c) bien++; else { mal++; console.log('✗ ' + n + (d !== undefined ? ' → ' + JSON.stringify(d) : '')); } };
 (async () => {
-  ok('sin configurar, las cuentas están apagadas (el Dojo funciona como siempre)', C.activa() === false);
-  localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: 'https://prueba.supabase.co', anon: 'a'.repeat(40) }));
-  ok('la configuración de prueba solo vale en modo pruebas', C.activa() === false);
+  ok('el proyecto de Supabase del Dojo está configurado', C.activa() === true && /^https:\/\/[a-z0-9]+\.supabase\.co$/.test(C.config().url) && /^sb_publishable_/.test(C.config().anon));
+  localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: '', anon: '' }));
+  ok('la configuración de prueba solo vale en modo pruebas', C.activa() === true);
   localStorage.setItem('dojo-pruebas', '1');
+  ok('en modo pruebas, con la dirección vacía, las cuentas se apagan', C.activa() === false);
+  localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: 'https://prueba.supabase.co', anon: 'a'.repeat(40) }));
   ok('en modo pruebas se activa', C.activa() === true);
   localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: 'https://evil.example.com', anon: 'a'.repeat(40) }));
   ok('solo acepta direcciones de Supabase', C.activa() === false);

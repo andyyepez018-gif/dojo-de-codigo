@@ -20,6 +20,12 @@ function domina(k, base = {}) {
   for (const b of Jm.bloques.slice(0, E.bloques)) o.jerga.bloques[b.id] = { ultimos: diez(), intentos: 10, aciertos: 10 };
   return o;
 }
+/* Las cuentas (Supabase) se apagan en todas las pruebas salvo en la suya, que usa un Supabase de mentira */
+function sinCuentas(b) {
+  const orig = b.newContext.bind(b);
+  b.newContext = async (...a) => { const c = await orig(...a); await c.addInitScript(() => { try { if (!localStorage.getItem('dojo-cuenta-config')) { localStorage.setItem('dojo-pruebas', '1'); localStorage.setItem('dojo-cuenta-config', JSON.stringify({ url: '', anon: '' })); } } catch (e) { /* nada */ } }); return c; };
+  return b;
+}
 async function nueva(b, opts = {}, progreso, antes) {
   const c = await b.newContext(opts);
   if (antes) await c.addInitScript(antes);
@@ -41,7 +47,7 @@ const sinDesbordar = p => p.evaluate(() => document.documentElement.scrollWidth 
 const { vozFalsa, resuelveIngles, resuelveExamen, cierraFiesta, CURSO } = require('./robot-ingles.js');
 
 (async () => {
-  const b = await chromium.launch();
+  const b = sinCuentas(await chromium.launch());
   const hoy = new Date(); const clave = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
 

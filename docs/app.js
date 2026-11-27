@@ -142,7 +142,8 @@ async function entraCuenta(nueva) {
     let r; try { r = await C.leeProgreso(); } catch (e) { r = null; }
     if (!r || !r.datos || !Object.keys(r.datos).length) pasar = await preguntaPasar(local);
   }
-  quitaAcceso(); await P.cargaNube(pasar);
+  const caja = $('#acceso .acceso-tarjeta'); if (caja) caja.append(h('p', { class: 'tenue', role: 'status' }, 'Cargando tu progreso…'));
+  await P.cargaNube(pasar); quitaAcceso();   // la pantalla de entrar se queda hasta tener su progreso
   aviso(`${nueva ? 'Cuenta creada. ' : ''}Hola, ${(s.user.nombre || '').split(' ')[0] || 'de nuevo'}.`, 4000);
 }
 function preguntaPasar(local) {
