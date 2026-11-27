@@ -30,6 +30,14 @@ create table if not exists public.progreso (
 alter table public.perfiles enable row level security;
 alter table public.progreso enable row level security;
 
+-- Permisos exactos para la app (sirve aunque el proyecto NO dé acceso automático a las tablas nuevas):
+-- los visitantes sin cuenta (anon) no tocan nada; los que entraron (authenticated) solo lo necesario,
+-- y las reglas de abajo (RLS) los limitan a SU fila.
+grant usage on schema public to anon, authenticated;
+revoke all on public.perfiles, public.progreso from anon;
+grant select, update on public.perfiles to authenticated;
+grant select, insert, update on public.progreso to authenticated;
+
 drop policy if exists "perfil propio: ver" on public.perfiles;
 drop policy if exists "perfil propio: cambiar" on public.perfiles;
 create policy "perfil propio: ver" on public.perfiles for select to authenticated using ((select auth.uid()) = id);
